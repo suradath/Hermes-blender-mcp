@@ -96,6 +96,10 @@ hermes mcp add blender --command "$PWD/.venv/bin/python" --connect-timeout 120 \
 - 🌳 ต้นไม้ — [`tools/tree_builder.py`](tools/tree_builder.py) · 🐕 สุนัข — [`tools/dog_builder.py`](tools/dog_builder.py)
 - 🏘️ ภาพหมู่ทั้งฉาก — [`tools/scene_builder.py`](tools/scene_builder.py)
 
+> 📦 **ไฟล์ `.obj` ที่โปรเจกต์สร้าง** เป็นมาตรฐานกลาง: **Y-up** (ไม่ต้องตั้ง `up_axis`)
+> และ `Kd` เป็น **linear** (สีตรงใน Blender ทันที) · ต้องการไบต์ดิบ (Z-up/sRGB)
+> ใช้ `write_obj(..., up="Z", linear_colors=False)`
+
 > 🧍 **สร้างตัวละคร 3D จากรูปที่แนบมาได้ไหม?** ได้ — แต่ต้องเข้าใจขอบเขต:
 > Hermes ดูรูป → ประเมินสัดส่วน/สี → สร้าง **blockout** ลงฉาก → ถ่ายภาพกลับมาดู → ปรับวนซ้ำ
 > ([คู่มือ](docs/03-สร้างตัวละครจากรูป.md) · [ตัวอย่างที่รันได้](examples/character_blockout.py))
@@ -250,6 +254,12 @@ run-hermes-blender-mcp.bat --selftest      :: Windows
 run-hermes-blender-mcp.bat --selftest --deep
 ```
 
+**ตรวจโหมดมีหน้าต่าง (เห็นสด) โดยไม่ต้องผ่าน Hermes:**
+```bat
+run-hermes-blender-mcp.bat --selftest --gui
+```
+→ Blender เปิดหน้าต่างขึ้นมาแล้วไล่ตรวจ 11 ขั้น ถ้าหน้าต่างค้างอยู่และผ่านหมด = โหมดเห็นสดพร้อมใช้ ✅
+
 ✅ ควรเห็นเพิ่ม: `✅ save_blend_file: selftest.blend · ... ไบต์` และ
 `✅ download_polyhaven_asset: <ชื่อเก้าอี้> → วัตถุ 2 → 5`
 (ถ้าเครื่องต่อเน็ตไม่ได้ จะขึ้น `⏭️ ข้าม` อย่างซื่อสัตย์ — ไม่นับเป็นความล้มเหลว)
@@ -385,19 +395,50 @@ hermes mcp configure blender            # เลือกเปิด/ปิด�
 }
 ```
 
-### โหมดมีหน้าต่าง (เห็นภาพขณะ AI ทำ)
+### 👀 โหมดเห็นสด — ให้ AI ทำงานในหน้าต่าง Blender ที่มองเห็น
 
-ต้องติดตั้ง add-on ก่อน (build zip → `Edit > Preferences > Add-ons > Install from Disk`)
-แล้วกด **"เริ่มสะพาน"** ในแผง `N > Blender MCP` — ขั้นตอนละเอียดพร้อมภาพอยู่ใน
-[`docs/01-ติดตั้ง-Windows11.md`](docs/01-ติดตั้ง-Windows11.md)
+ค่าปริยายคือ **headless** (`blender -b`): AI สร้างของจริง แต่**มองไม่เห็น**
+ถ้าอยากดูของโผล่ขึ้นมาทีละชิ้น มี 2 ทาง
 
-```bash
-python tools/build_addon_zip.py            # สร้าง dist/blender_mcp_bridge-<ver>.zip
-hermes mcp add blender --command "..." --connect-timeout 60 \
-  --args blender_mcp_server.py --attach 127.0.0.1:9876 --token "TOKEN_จากแผง"
+#### ทางที่ 1 (ง่ายสุด) — ให้เซิร์ฟเวอร์เปิด Blender พร้อมหน้าต่างเอง: `--gui`
+
+```yaml
+mcp_servers:
+  blender:
+    command: C:\Hermes-blender-mcp\.venv\Scripts\python.exe
+    args:
+      - C:\Hermes-blender-mcp\blender_mcp_server.py
+      - --gui                 # ← แต่ละบรรทัดต้องแยกกัน (ห้ามต่อท้าย path)
+    connect_timeout: 120.0
+    timeout: 300
+    enabled: true
 ```
 
----
+- ครั้งแรกที่ AI เรียกเครื่องมือ → **หน้าต่าง Blender เปิดขึ้นมาเอง** ✅
+- ทำงานบน main thread ผ่าน `bpy.app.timers` (`--mode timer`) → **เห็นของทีละชิ้น** ✅
+- อยากเปิดไฟล์งานตัวเอง: เพิ่ม `- --blend-file` แล้วตามด้วย `- "C:\งาน\บ้าน.blend"`
+- ⚠️ **`--gui` เปิด Blender ใหม่ ไม่ได้ไปใช้หน้าต่างที่คุณเปิดไว้** — ถ้าอยากใช้หน้าต่างเดิม ใช้ทางที่ 2
+
+> 🩺 ในหน้าต่าง Blender ถ้ามีของแต่กล้องมองไม่เห็น → กด **`Home`** (Frame All)
+> หรือ **`Numpad 0`** (มุมมองกล้อง) · หรือสั่ง AI ว่า *"frame all แล้วถ่ายภาพ viewport ให้ดู"*
+
+#### ทางที่ 2 — ต่อกับ Blender ที่คุณเปิดอยู่แล้ว (ต้องติด add-on)
+
+ติดตั้ง add-on → `Edit > Preferences > Add-ons > ▼ > Install from Disk...`
+(สร้าง zip ด้วย `python tools/build_addon_zip.py`) → ติ๊กถูกที่ **Hermes Blender MCP Bridge**
+→ ในหน้า 3D กด **N** → แท็บ **Blender MCP** → **"เริ่มสะพาน"** → จดพอร์ต + token
+
+```yaml
+    args:
+      - C:\Hermes-blender-mcp\blender_mcp_server.py
+      - --attach
+      - 127.0.0.1:9876              # พอร์ตที่แผงแสดง
+      - --token
+      - "<token ที่แผงแสดง>"
+```
+
+ข้อดี: ไม่มีการเปิด/ปิด Blender เลย ✅ ใช้ไฟล์ที่เปิดอยู่ ✅
+รายละเอียดเต็ม: [`docs/01-ติดตั้ง-Windows11.md`](docs/01-ติดตั้ง-Windows11.md)
 
 ## 5. ลองสั่งงานครั้งแรก
 
@@ -541,6 +582,10 @@ MCP สื่อสารผ่าน stdio แต่ `blender -b` พ่นข�
 | `ต่อสะพานไม่สำเร็จ` (โหมด attach) | ตรวจว่ากด "เริ่มสะพาน" ใน Blender แล้ว และ token ตรงกัน |
 | ถูกปฏิเสธ "ฝ่าด่านความปลอดภัย" | เป็นไปตามการออกแบบ — ถ้าตั้งใจจริงส่ง `allow_unsafe=true` |
 | รัน `.bat` แล้วไม่มีอะไรเกิดขึ้น | ปกติ — มันรอคำสั่ง JSON-RPC ทาง stdin ให้ Hermes เรียก |
+| **AI สร้างของแล้วไม่โผล่ในหน้าต่าง Blender ที่เปิดอยู่** | มี **Blender สองตัว** — เซิร์ฟเวอร์เปิดของมันเองแบบ headless อยู่อีกตัว · ใช้ `--gui` (ให้มันเปิดหน้าต่างเอง) หรือ `--attach` + add-on (ต่อกับหน้าต่างที่คุณเปิด) — ดู [โหมดเห็นสด](#-โหมดเห็นสด--ให้-ai-ทำงานในหน้าต่าง-blender-ที่มองเห็น) |
+| **Blender เปิดแล้วปิดทันที ซ้ำ ๆ** | ต่อสะพานไม่ติด → เซิร์ฟเวอร์สั่งปิดเพื่อไม่ให้หน้าต่างค้าง (กันไป 20 วินาทีแล้วลองใหม่) · ทดสอบตรง ๆ ด้วย `run-hermes-blender-mcp.bat --selftest --gui` แล้วอ่าน error |
+| **มีของในหน้าต่างแต่ไม่เห็น** | กล้องไม่ได้มองจุดนั้น — กด `Home` (Frame All) หรือ `Numpad 0` · หรือสั่ง AI ว่า "frame all แล้วถ่ายภาพ viewport" |
+| **นำเข้า `.obj` แล้วโมเดลนอนตะแคง / สีซีด** | แก้ใน v1.0.5 — ไฟล์ส่งออกเป็น **Y-up** และ `Kd` เป็น **linear** ตามมาตรฐาน OBJ แล้ว → **นำเข้าด้วยค่าปริยายได้เลย** (ถ้าใช้ไฟล์เก่า ให้ import ด้วย `up_axis='Z'` และแปลงสีเอง) |
 | add-on บอกหาสะพานไม่เจอ | สองไฟล์ไม่ได้อยู่โฟลเดอร์เดียวกัน — ดู [`docs/01`](docs/01-ติดตั้ง-Windows11.md) หรือตั้ง `BLENDER_MCP_DIR` |
 
 ยังไม่หาย? เปิด issue พร้อมแนบบันทึกท้าย ๆ และผลของ
