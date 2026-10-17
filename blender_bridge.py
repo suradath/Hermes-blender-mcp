@@ -1322,6 +1322,9 @@ def _pump(f) -> None:
 
 # ------------------------------------------- โหมด 2: timer (Blender ที่เปิดหน้าต่าง)
 
+_LIVE_PUMPS: list = []      # กัน GC: เก็บ TimerPump ที่ยังทำงานอยู่
+
+
 class TimerPump:
     """รับงานใน thread แยก แล้วให้ main thread ทำผ่าน ``bpy.app.timers``"""
 
@@ -1335,18 +1338,35 @@ class TimerPump:
 
     # ---- ฝั่ง main thread ----
     def drain(self) -> float:
-        """เรียกโดย bpy.app.timers — ทำงาน bpy ทีละงานบน main thread"""
-        while True:
-            try:
-                msg, fut = self.jobs.get_nowait()
-            except queue.Empty:
-                break
-            if not fut.set_running_or_notify_cancel():
-                continue
-            try:
-                fut.set_result(handle_message(msg))
-            except BaseException as exc:  # noqa: BLE001
-                fut.set_exception(exc)
+        """เรียกโดย bpy.app.timers — ทำงาน bpy ทีละงานบน main thread
+
+        ⚠️ ต้องไม่มีวัน raise: ถ้า timer callback โยน exception Blender จะ
+        **ถอด timer ออกทันที** → ตัว pump ไม่มีใครอ้างถึง → GC เก็บ → ซ็อกเก็ตปิด
+        → ผลคือ "ต่อติดครั้งแรกแล้ว refused ตลอด" (เจอจริงบน Blender 5.2.2)
+        จึงห่อทั้งก้อนและคืน interval เสมอ
+        """
+        try:
+            while True:
+                try:
+                    msg, fut = self.jobs.get_nowait()
+                except queue.Empty:
+                    break
+                if not fut.set_running_or_notify_cancel():
+                    continue
+                try:
+                    fut.set_result(handle_message(msg))
+                except BaseException as exc:  # noqa: BLE001
+                    try:
+                        fut.set_exception(exc)
+                    except Exception:
+                        pass
+                    log(f"งานล้มเหลว: {type(exc).__name__}: {exc}")
+        except BaseException as exc:  # noqa: BLE001
+            log(f"timer pump ผิดพลาด (ยังทำงานต่อ): {type(exc).__name__}: {exc}")
+        # กล่องดำ: ยืนยันว่า timer ยังเต้นอยู่ (ไม่สแปม — แค่ 5 ครั้งแรก ๆ)
+        self._ticks = getattr(self, "_ticks", 0) + 1
+        if self._ticks in (1, 20, 100, 1000, 10000):
+            log(f"timer เต้นปกติ (tick {self._ticks})")
         return self.interval
 
     # ---- ฝั่ง thread รับงาน ----
@@ -1466,6 +1486,13 @@ def main(argv: list[str] | None = None) -> int:
 
     pump = TimerPump(args.host, args.port, args.token, args.interval)
     pump.start()
+    # ⚠️ ต้องมี reference ที่มีชีวิตยาว: สคริปต์ --python จบแล้วตัวแปรใน main()
+    #    อาจถูกเก็บกวาด → ซ็อกเก็ตปิด → เซิร์ฟเวอร์ "refused" ทุกครั้งหลังจากนั้น
+    _LIVE_PUMPS.append(pump)
+    try:
+        bpy.app.driver_namespace["blender_mcp_pump"] = pump
+    except Exception:
+        pass
     try:
         bpy.app.timers.register(pump.drain, first_interval=args.interval, persistent=True)
     except Exception as exc:
