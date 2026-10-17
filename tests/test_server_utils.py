@@ -120,6 +120,23 @@ check("รับ --gui ได้", a.gui is True)
 check("รับ --attach ได้", a.attach == "127.0.0.1:9876")
 check("รับ --timeout ทศนิยมได้", a.timeout == 5.5)
 check("--workdir ที่ไม่ระบุ → None (ใช้โฟลเดอร์โปรเจกต์)", a.working_dir is None)
+check("ไม่มีอาร์กิวเมนต์แปลก → unknown_args ว่าง", a.unknown_args == [], str(a.unknown_args))
+
+# ⚠️ ต้องอดทนต่ออาร์กิวเมนต์แปลก (บทเรียนจาก `hermes mcp add`:
+#    ถ้าออกทันที ไคลเอนต์รายงานแค่ "Connection closed" ซึ่งหาสาเหตุยากมาก)
+a = srv.parse_args(["blender_mcp_server.py", "--timeout", "7",
+                    "--connect-timeout", "120", "--args"])
+check("อาร์กิวเมนต์แปลกต้องไม่ทำให้ออก (ไม่ raise SystemExit)", a.timeout == 7, str(a.timeout))
+check("ยังอ่านค่าที่รู้จักได้ตามปกติ", a.timeout == 7)
+check("เก็บอาร์กิวเมนต์แปลกไว้รายงาน", "--connect-timeout" in a.unknown_args
+      and "--args" in a.unknown_args, str(a.unknown_args))
+check("พารามิเตอร์ที่เหลือยังใช้ค่าปริยาย",
+      a.attach == "" and a.gui is False and a.timeout == 7)
+src = (ROOT / "blender_mcp_server.py").read_text(encoding="utf-8")
+check("ใช้ parse_known_args (กันคนเผลอเปลี่ยนกลับเป็น parse_args)",
+      "parse_known_args" in src, "ต้องอดทนต่ออาร์กิวเมนต์ที่ไคลเอนต์เติมมา")
+check("รายงานอาร์กิวเมนต์ที่ข้ามลงบันทึก (ไม่เงียบ)",
+      "ข้ามอาร์กิวเมนต์ที่ไม่รู้จัก" in src)
 
 # ===========================================================================
 section("[4] BridgeClient — ส่งพารามิเตอร์ที่ไม่ใช้ต้องไม่หลุดไป")

@@ -626,7 +626,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--list-tools", action="store_true", help="พิมพ์รายการเครื่องมือแล้วจบ")
     p.add_argument("--selftest", action="store_true",
                    help="เริ่ม Blender จริง เรียกทุกเครื่องมือ แล้วจบ (ใช้ตรวจการติดตั้ง)")
-    args = p.parse_args(argv)
+    # ⚠️ ใช้ parse_known_args ไม่ใช่ parse_args
+    #
+    # ไคลเอนต์ MCP หลายตัวเติมอาร์กิวเมนต์ของตัวเองต่อท้ายบรรทัดคำสั่ง
+    # (เกิดกับเราจริงตอน `hermes mcp add` ที่ต้องให้ --args อยู่ท้ายสุด — พอมี
+    # ตัวเลือกของ Hermes ต่อท้าย มันกลายเป็นอาร์กิวเมนต์ของเซิร์ฟเวอร์)
+    # ถ้าเราออกทันทีเพราะเจออาร์กิวเมนต์แปลก ไคลเอนต์จะรายงานแค่
+    # "Connection closed" ซึ่งชี้ทางผิดไปไกลและหาสาเหตุยากมาก
+    #
+    # ⇒ ไม่ล้ม แต่ **บันทึกไว้ให้เห็น** (แนวทางเดียวกับ ahujasid/mcp-for-blender)
+    args, unknown = p.parse_known_args(argv)
+    args.unknown_args = list(unknown)
     if not args.log_file:
         args.log_file = str(pathlib.Path(tempfile.gettempdir()) / "blender-mcp" /
                             f"server-{os.getpid()}.log")
@@ -639,6 +649,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     log.open(pathlib.Path(args.log_file))
     log(f"เริ่ม MCP server · บันทึกที่ {args.log_file} · Python {platform.python_version()}")
+    if getattr(args, "unknown_args", None):
+        log(f"⚠️  ข้ามอาร์กิวเมนต์ที่ไม่รู้จัก {len(args.unknown_args)} ตัว: "
+            f"{' '.join(args.unknown_args)}")
+        log("    มักเกิดจากไคลเอนต์ MCP เติมอาร์กิวเมนต์ของตัวเองต่อท้ายบรรทัดคำสั่ง "
+            "(ถ้าไม่ตั้งใจ ให้ตรวจ config — โดยเฉพาะลำดับ --args ที่ต้องอยู่ท้ายสุด)")
 
     if args.check:
         found, how = find_blender(args.blender)

@@ -76,7 +76,7 @@ _ยังไม่มี_
   · `docs/02-Hermes-config.md`
 
 **การทดสอบและ CI**
-- **329 ข้อ ใน 5 ชุด** ทดสอบด้วยของจริงทุกชั้นยกเว้นตัว Blender (ใช้ `tests/fake_bpy.py`)
+- **343 ข้อ ใน 5 ชุด** ทดสอบด้วยของจริงทุกชั้นยกเว้นตัว Blender (ใช้ `tests/fake_bpy.py`)
 - `test_mcp_e2e.py` ขับด้วย **MCP client ทางการ** ผ่าน stdio จริง ครบวงจร
 - GitHub Actions รันบน Python 3.10 + 3.12 พร้อมตรวจว่า **stdout ว่าง 0 ไบต์** ตอนสตาร์ต
 
@@ -113,7 +113,7 @@ _ยังไม่มี_
 - เชื่อมกับ **Hermes Agent ตัวจริง** ได้: `hermes mcp add` → `✓ Connected! Found 8 tool(s)`
   · `hermes mcp test` → `✓ Connected (1950ms) · ✓ Tools discovered: 8`
 - stdout ว่าง 0 ไบต์ตอนสตาร์ต (ท่อ JSON-RPC สะอาด)
-- ชุดทดสอบ 329 ข้อ ผ่านหมด
+- ชุดทดสอบ 343 ข้อ ผ่านหมด
 
 **ยังไม่ได้ยืนยัน**
 - การเปิด/ปิด **Blender จริง** และ `bpy.app.timers` ของจริง (เครื่องที่พัฒนาไม่มี Blender)

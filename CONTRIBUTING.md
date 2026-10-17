@@ -4,7 +4,7 @@
 ที่ตั้งใจให้คนอื่นนำไปใช้และต่อยอดได้
 
 > 🇬🇧 **In short (English):** set up with `python -m venv .venv && pip install -r requirements.txt`,
-> run `bash tests/run_all.sh` (5 suites, 329 checks — **no Blender needed**), keep the
+> run `bash tests/run_all.sh` (5 suites, 343 checks — **no Blender needed**), keep the
 > rules in [§4](#4-กฎที่โปรเจกต์นี้บังคับ-และทำไม) (never write to stdout,
 > never call `bpy` off the main thread, errors must be Thai and wrapped in `ToolError`,
 > rotation is in degrees, docs must stay in two-language parity), and open one
@@ -69,13 +69,13 @@ python3 -m venv .venv
 bash tests/run_all.sh
 ```
 
-ต้องผ่านทั้ง **5 ชุด (329 ข้อ)** ก่อนเปิด pull request:
+ต้องผ่านทั้ง **5 ชุด (343 ข้อ)** ก่อนเปิด pull request:
 
 | ชุด | ตรวจอะไร |
 |---|---|
 | `test_addon_structure.py` | โครง add-on ตามที่ Blender ต้องการ + ตัวสร้าง zip |
-| `test_docs_links.py` | ลิงก์ · คู่มือสองภาษาตรงกัน · อักษรต่างชาติหลุด |
-| `test_server_utils.py` | ค้นหา Blender · CLI · การส่งพารามิเตอร์ |
+| `test_docs_links.py` | ลิงก์ · คู่มือสองภาษาตรงกัน · อักษรต่างชาติหลุด · การเทียบโครงการอื่น |
+| `test_server_utils.py` | ค้นหา Blender · CLI · อดทนต่ออาร์กิวเมนต์แปลก · การส่งพารามิเตอร์ |
 | `test_bridge_logic.py` | ตรรกะทุกเครื่องมือ + ด่านความปลอดภัย (ใช้ `bpy` ปลอม) |
 | `test_mcp_e2e.py` | MCP client ทางการ ⇄ เซิร์ฟเวอร์ ⇄ สะพาน (ครบวงจร) |
 
