@@ -146,13 +146,47 @@ def _object_summary(obj) -> dict:
     return info
 
 
-def _collection_path(coll) -> str:
-    """เส้นทางของคอลเลกชัน เช่น 'Scene Collection/Props/ trees '"""
-    parts, node = [], coll
-    while node is not None:
-        parts.append(node.name)
-        node = node.parent
-    return "/".join(reversed(parts))
+def _collection_path(coll, root=None) -> str:
+    """เส้นทางของคอลเลกชัน เช่น 'Scene Collection/Props/trees'
+
+    ⚠️ ``bpy.types.Collection`` **ไม่มี** ``.parent`` (Blender 5.2 โยน
+    ``AttributeError: 'Collection' object has no attribute 'parent'``) —
+    ความสัมพันธ์เก็บด้านเดียวที่ ``parent.children`` จึงต้องไล่จากรากลงมา
+    คอลเลกชันอาจถูก link ไว้ใต้หลายที่ (DAG) — คืนเส้นทางแรกที่เจอ พร้อมกันวนซ้ำ
+    """
+    name = getattr(coll, "name", "?")
+    try:
+        root = _scene().collection if root is None else root
+    except Exception:
+        return name
+    if root is None:
+        return name
+    found = _find_collection_in(root, coll, trail=None, depth=0)
+    return "/".join(found) if found else name
+
+
+def _collection_children(coll):
+    try:
+        return [c for c in coll.children]
+    except Exception:
+        return []
+
+
+def _find_collection_in(node, want, trail=None, depth=0):
+    """DFS จากรากลงมา (ไม่ใช้ .parent) — คืน list ของชื่อหรือ None"""
+    if depth > 32:                      # กันฉากแปลก ๆ ที่อ้างกันเป็นวง
+        return None
+    trail = list(trail or ()) + [getattr(node, "name", "?")]
+    try:
+        if node == want:                # bpy สร้าง wrapper ใหม่ทุกครั้ง → ใช้ == ไม่ใช่ is
+            return trail
+    except Exception:
+        pass
+    for child in _collection_children(node):
+        got = _find_collection_in(child, want, trail=trail, depth=depth + 1)
+        if got:
+            return got
+    return None
 
 
 def _objects_in(coll):

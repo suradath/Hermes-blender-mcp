@@ -10,6 +10,34 @@
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-10-17
+
+### แก้ไข (Fixed)
+
+**`get_scene_hierarchy` ใช้ไม่ได้บน Blender จริง** — เจอจากการรัน `--selftest` บน
+Windows 11 + Blender 5.2.2 (เครื่องพัฒนาไม่มี Blender จึงตรวจไม่เจอ):
+
+```
+❌ get_scene_hierarchy: AttributeError: 'Collection' object has no attribute 'parent'
+```
+
+- สาเหตุ: `bpy.types.Collection` **ไม่มี** `.parent` — ความสัมพันธ์เก็บด้านเดียวที่
+  `parent.children` โค้ดเดิมไล่ขึ้นไปหา `.parent` จึงโยน `AttributeError` ทันที
+- แก้: ไล่จากรากของฉากลงมา (DFS ผ่าน `children`) · กันลึกเกิน 32 ชั้น ·
+  รองรับคอลเลกชันที่ถูก link ใต้หลายที่ (คืนเส้นทางแรกที่เจอ)
+- **ต้นเหตุที่เทสต์ไม่จับ**: `tests/fake_bpy.py` "ประดิษฐ์" `.parent` ให้คอลเลกชัน
+  → เทสต์ผ่านทั้งที่โค้ดพังจริง · **ถอด `.parent` ออกจาก fake แล้ว** ให้ตรงกับ API จริง
+  (`FakeSceneCollection("x", parent=p)` เชื่อมผ่าน `p.children.link(x)` แทน)
+- เพิ่มเทสต์กันพลาดซ้ำ 3 ข้อ: fake ต้องไม่มี `.parent` · เส้นทางซ้อน 2 ชั้น ·
+  คอลเลกชันที่อยู่ใต้ 2 ที่ต้องไม่ค้าง
+
+### เพิ่ม (Added)
+
+- `--selftest` ตรวจเพิ่ม 2 อย่าง: **เส้นทางคอลเลกชัน** (จับบั๊กข้างบนได้ทันที) และ
+  **`get_viewport_screenshot` ใต้ `--background`** (จุดที่ Blender headless พังบ่อยที่สุด)
+
+
+
 ### เพิ่ม (Added)
 
 **คลังของฟรีที่ไม่ต้องใช้คีย์ (Poly Haven · CC0)** — เครื่องมือใหม่ 3 ตัว (รวมเป็น 12)

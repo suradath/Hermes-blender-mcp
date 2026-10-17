@@ -29,7 +29,7 @@ Hermes Blender MCP Bridge — ส่วนเสริม (Add-on) สำหร�
 bl_info = {
     "name": "Hermes Blender MCP Bridge",
     "author": "LPM-AI-AST / โรงเรียนลำปลายมาศ",
-    "version": (1, 0, 0),
+    "version": (1, 0, 1),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar (N) > Blender MCP",
     "description": "เปิดสะพานให้ Hermes (MCP) สั่งงาน Blender ได้ระหว่างที่หน้าต่างเปิดอยู่",

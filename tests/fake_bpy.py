@@ -270,7 +270,12 @@ class FakeModifier:
 
 # ------------------------------------------------------------------ คอลเลกชันฉาก
 class _ChildList(list):
-    """``collection.children`` ของจริงมี .link()/.unlink() และตั้ง .parent ให้ด้วย"""
+    """``collection.children`` ของจริง: link/unlink ได้
+
+    ⚠️ ห้ามประดิษฐ์ ``coll.parent`` — ``bpy.types.Collection`` ไม่มี attribute นี้
+    (Blender 5.2: AttributeError) ความสัมพันธ์เก็บด้านเดียวที่ ``children`` เท่านั้น
+    Fake ที่เติม .parent ให้เองทำให้เทสต์ผ่านทั้งที่โค้ดพังบน Blender จริง
+    """
 
     def __init__(self, owner):
         super().__init__()
@@ -279,14 +284,11 @@ class _ChildList(list):
     def link(self, coll):
         if coll not in self:
             self.append(coll)
-        coll.parent = self.owner
         return None
 
     def unlink(self, coll):
         if coll in self:
             self.remove(coll)
-        if getattr(coll, "parent", None) is self.owner:
-            coll.parent = None
         return None
 
 
@@ -305,12 +307,15 @@ class _ObjectList(list):
 
 
 class FakeSceneCollection:
+    """คอลเลกชันของฉาก — ไม่มี .parent (เหมือน bpy.types.Collection)"""
+
     def __init__(self, name="Collection", parent=None):
         self.name = name
-        self.parent = parent
         self.objects = _ObjectList(self)
         self.children = _ChildList(self)
         self.hide_viewport = False
+        if parent is not None:
+            parent.children.link(self)      # เชื่อมด้านเดียวเหมือนของจริง
 
     def link(self, obj):
         """เหมือนของจริง — ย้ายวัตถุเข้าคอลเลกชันนี้"""
@@ -712,7 +717,6 @@ def reset(background: bool = True):
     DATA.lights.add(light)
     scene.camera = cam              # เหมือนไฟล์เริ่มต้นของ Blender (มีกล้องตั้งไว้แล้ว)
     props = FakeSceneCollection("Props", parent=scene.collection)
-    scene.collection.children.append(props)
     DATA.collections.add(props)
     a = FakeObject("tree_a", "MESH", (1.0, 2.0, 3.0))
     a.parent = cube

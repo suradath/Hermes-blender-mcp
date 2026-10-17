@@ -52,7 +52,7 @@ from mcp.types import TextContent
 
 HERE = pathlib.Path(__file__).resolve().parent
 BRIDGE_SCRIPT = HERE / "blender_bridge.py"
-SERVER_VERSION = "1.0.0"
+SERVER_VERSION = "1.0.1"
 MIN_BLENDER = (4, 0)          # ใช้ API ที่มีมาตั้งแต่ 4.0 (5.2 คือเป้าหมาย)
 # เวอร์ชันโปรโตคอลระหว่างเซิร์ฟเวอร์กับสะพาน — ต้องตรงกัน ไม่งั้นมักแปลว่า
 # add-on ที่ติดตั้งไว้เป็นเวอร์ชันเก่า (bridge เก่าคุยกับเซิร์ฟเวอร์ใหม่)
@@ -936,14 +936,43 @@ def _selftest(rt: Runtime) -> int:
         ("delete_object", {"name": "LPM_Test", "confirm": True}),
     ]
     bad = 0
+    results = {}
     for tool, kwargs in checks:
         try:
             res = rt.call(tool, **kwargs)
+            results[tool] = res
             snippet = json.dumps(res, ensure_ascii=False)[:110]
             print(f"✅ {tool}: {snippet}")
         except Exception as exc:  # noqa: BLE001
             bad += 1
             print(f"❌ {tool}: {exc}")
+
+    # ตรวจเส้นทางคอลเลกชัน — บั๊กจริงที่เจอบน Blender 5.2.2:
+    #   AttributeError: 'Collection' object has no attribute 'parent'
+    hier = results.get("get_scene_hierarchy") or {}
+    colls = hier.get("collections") or []
+    root_name = colls[0].get("name", "") if colls else ""
+    bad_paths = [c.get("path", "") for c in colls
+                 if not c.get("path") or (root_name and not c["path"].startswith(root_name))]
+    if bad_paths or not colls:
+        bad += 1
+        print(f"❌ collection path: {bad_paths or 'ไม่พบคอลเลกชันเลย'}")
+    else:
+        print("✅ collection path: %d คอลเลกชัน · ตัวอย่าง %s"
+              % (len(colls), [c["path"] for c in colls[:3]]))
+
+    # screenshot ใต้ --background — จุดที่พังง่ายที่สุดของ Blender headless
+    try:
+        shot = rt.call("get_viewport_screenshot", mode="render", width=320, height=240)
+        fp = pathlib.Path(str((shot or {}).get("filepath", "")))
+        if fp.is_file() and fp.stat().st_size > 0:
+            print(f"✅ get_viewport_screenshot: {fp.name} · {fp.stat().st_size} ไบต์")
+        else:
+            bad += 1
+            print(f"❌ get_viewport_screenshot: ไม่ได้ไฟล์ ({(shot or {}).get('filepath')})")
+    except Exception as exc:  # noqa: BLE001
+        bad += 1
+        print(f"❌ get_viewport_screenshot: {exc}")
     try:
         meta = rt.client.request("file_metadata")
         print(f"✅ resource file_metadata: {json.dumps(meta, ensure_ascii=False)[:110]}")

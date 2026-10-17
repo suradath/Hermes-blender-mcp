@@ -83,6 +83,31 @@ props = next(c for c in h["collections"] if c["name"] == "Props")
 check("เส้นทางคอลเลกชันซ้อนถูก", props["path"] == "Scene Collection/Props", props["path"])
 check("Props มี tree_a อยู่ข้างใน", props["objects"] == ["tree_a"], str(props["objects"]))
 
+# ── บทเรียนจาก Blender จริง 5.2.2 ────────────────────────────────────────────
+# get_scene_hierarchy เคยพังบน Blender จริงด้วย
+#   AttributeError: 'Collection' object has no attribute 'parent'
+# เพราะ bpy.types.Collection ไม่มี .parent (ความสัมพันธ์เก็บที่ parent.children)
+# และ fake_bpy เคย "ประดิษฐ์" .parent ให้ → เทสต์ผ่านทั้งที่โค้ดพังจริง
+props_coll = fake_bpy.data.collections["Props"]
+check("คอลเลกชันไม่มี .parent (เหมือน Blender จริง)",
+      not hasattr(props_coll, "parent"),
+      "fake ต้องไม่เติม .parent — ของจริงไม่มี attribute นี้")
+trees_coll = fake_bpy.FakeSceneCollection("trees", parent=props_coll)
+fake_bpy.data.collections.add(trees_coll)
+h2 = ok("get_scene_hierarchy")
+trees = next(c for c in h2["collections"] if c["name"] == "trees")
+check("เส้นทางคอลเลกชันซ้อน 2 ชั้นถูก",
+      trees["path"] == "Scene Collection/Props/trees", trees["path"])
+fake_bpy.data.scenes[0].collection.children.link(trees_coll)   # DAG: อยู่ใต้ 2 ที่
+h3 = ok("get_scene_hierarchy")
+trees = next(c for c in h3["collections"] if c["name"] == "trees")
+check("คอลเลกชันที่ถูก link ใต้ 2 ที่ ไม่ทำให้ค้าง/พัง",
+      trees["path"] in ("Scene Collection/trees", "Scene Collection/Props/trees"),
+      trees["path"])
+fake_bpy.data.scenes[0].collection.children.unlink(trees_coll)
+props_coll.children.unlink(trees_coll)
+fake_bpy.data.collections.remove(trees_coll)
+
 cube = next(o for o in h["objects"] if o["name"] == "Cube")
 check("บอกจำนวนจุดยอดของ mesh", cube.get("vertices") == 8 and cube.get("polygons") == 6, str(cube))
 tree = next(o for o in h["objects"] if o["name"] == "tree_a")
