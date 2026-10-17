@@ -299,6 +299,19 @@ check("ไม่ใส่ --deep → ตรวจแค่พื้นฐาน"
       str(getattr(_fake_selftest, "seen", None)))
 
 
+section("[9] บทเรียนจากโหมด GUI (จาก log จริงของผู้ใช้)")
+_src = (ROOT / "blender_mcp_server.py").read_text(encoding="utf-8")
+check("ส่งโทเคนเป็น --token=<ค่า> (กันโทเคนที่เริ่มด้วย -)",
+      'f"--token={self.token}"' in _src,
+      "ต้องใช้ --token=<ค่า> ไม่ใช่ ['--token', token]")
+check("โทเคนไม่ขึ้นต้นด้วย - หรือ _",
+      'lstrip("-_")' in _src, "กัน argparse ตีความเป็น option")
+check("อ่าน JSON ของสะพานได้แม้มีข้อความนำหน้า (โหมด GUI พิมพ์ warning ปน)",
+      'cut = stripped.find("{")' in _src, "ต้องหา { ในบรรทัด ไม่ใช่ startswith")
+check("ต่อสะพานไม่ติด → หยุด Blender ก่อน (กันหน้าต่างผีค้าง)",
+      "ต่อสะพานไม่สำเร็จ" in _src and "self.proc.stop()" in _src)
+
+
 print()
 print("=" * 70)
 if failed:

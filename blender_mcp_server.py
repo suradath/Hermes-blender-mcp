@@ -52,7 +52,7 @@ from mcp.types import TextContent
 
 HERE = pathlib.Path(__file__).resolve().parent
 BRIDGE_SCRIPT = HERE / "blender_bridge.py"
-SERVER_VERSION = "1.0.5"
+SERVER_VERSION = "1.0.6"
 MIN_BLENDER = (4, 0)          # ใช้ API ที่มีมาตั้งแต่ 4.0 (5.2 คือเป้าหมาย)
 # เวอร์ชันโปรโตคอลระหว่างเซิร์ฟเวอร์กับสะพาน — ต้องตรงกัน ไม่งั้นมักแปลว่า
 # add-on ที่ติดตั้งไว้เป็นเวอร์ชันเก่า (bridge เก่าคุยกับเซิร์ฟเวอร์ใหม่)
@@ -386,7 +386,11 @@ class BlenderProcess:
         self.args = args
         self.proc: subprocess.Popen | None = None
         self.port: int | None = None
-        self.token = secrets.token_urlsafe(24)
+        # ⚠️ ห้ามขึ้นต้นด้วย - หรือ _ : ตอนส่งต่อให้ Blender ผ่าน argparse
+        #    ค่าที่เริ่มด้วย - จะถูกตีความเป็น option (เจอจริง: expected one argument)
+        self.token = secrets.token_urlsafe(24).lstrip("-_")
+        if len(self.token) < 16:
+            self.token = "t" + secrets.token_urlsafe(24).replace("-", "x").replace("_", "y")
         self._ready = threading.Event()
         self._failed = threading.Event()
         self._err_lines: list[str] = []
@@ -407,7 +411,12 @@ class BlenderProcess:
             if self.args.blend_file:
                 cmd.insert(1, str(self.args.blend_file))
         # ส่งตัวแปรที่บอกโหมด bridge ชัดเจน
-        cmd += ["--mode", "main" if not self.args.gui else "timer",
+        # ⚠️ ต้องเป็น --token=<ค่า> ไม่ใช่ ["--token", token] เพราะถ้าโทเคนบังเอิญ
+        #    เริ่มด้วย - (เช่น "-95vRW...") argparse จะตีความเป็น option แล้วขึ้น
+        #    "argument --token: expected one argument" (เจอจริงจาก log ของผู้ใช้)
+        cmd = [c for c in cmd if not c.startswith("--token")]
+        cmd += [f"--token={self.token}",
+                "--mode", "main" if not self.args.gui else "timer",
                 "--interval", str(self.args.interval)]
 
         log("เปิด Blender:", " ".join(cmd))
@@ -433,15 +442,20 @@ class BlenderProcess:
             self._err_lines.append(line)
             if len(self._err_lines) > 400:
                 del self._err_lines[:200]
-            # สะพานประกาศตัวด้วย JSON บรรทัดเดียว — ต้องมาก่อนบรรทัดของ Blender เอง
+            # สะพานประกาศตัวด้วย JSON บรรทัดเดียว
+            # ⚠️ บทเรียนจริง (โหมด GUI): Blender หน้าต่างพิมพ์ warning ปนหน้ามาได้
+            #    จึงต้องหา "ก้อน JSON" ในบรรทัด ไม่ใช่ดูว่าเริ่มต้นด้วย { เท่านั้น
+            #    (เดิมพลาด → พอร์ตยังเป็น 0 → ต่อพอร์ต 0 → WinError 10061 refused)
             stripped = line.strip()
-            if stripped.startswith("{"):
+            cut = stripped.find("{")
+            if cut >= 0:
                 try:
-                    obj = json.loads(stripped)
+                    obj = json.loads(stripped[cut:])
                 except json.JSONDecodeError:
                     obj = None
                 if isinstance(obj, dict) and obj.get("bridge_ready") and obj.get("port"):
                     self.port = int(obj["port"])
+                    log(f"สะพานพร้อมที่พอร์ต {self.port}")
                     self._ready.set()
                     continue
             if "[blender-bridge]" in line or "Error" in line or "error" in line:
@@ -550,7 +564,21 @@ class Runtime:
                     f"\"{found}\" --background --python \"{BRIDGE_SCRIPT}\" -- --port 0 --selftest")
             self.client.port = self.proc.port or 0
             self.client.token = self.proc.token
-            self.client.connect(timeout=30)
+            if not self.client.port:
+                tail = self.proc.tail()
+                self.proc.stop()
+                self.proc = None
+                raise BridgeError(
+                    "Blender แจ้งว่าพร้อม แต่ไม่ได้บอกพอร์ต (บรรทัด JSON หาย) — "
+                    f"บันทึกท้าย ๆ:\n{tail}")
+            try:
+                self.client.connect(timeout=30)
+            except BridgeError:
+                # กัน Blender ค้างเป็นหน้าต่างผีหลังต่อไม่ติด (เจอจริง: เปิดค้างหลายบาน)
+                tail = self.proc.tail()
+                self.proc.stop()
+                self.proc = None
+                raise BridgeError(f"ต่อสะพานไม่สำเร็จ — บันทึกท้าย ๆ:\n{tail}") from None
             warn = check_bridge_protocol(self.client.info)
             if warn:
                 log(f"⚠️  {warn}")
