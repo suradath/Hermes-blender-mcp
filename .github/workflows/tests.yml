@@ -57,5 +57,30 @@ jobs:
       - name: สร้าง zip ของ add-on (ต้องได้โครงสร้างถูกต้อง)
         run: python tools/build_addon_zip.py
 
-      - name: รันชุดทดสอบทั้งหมด
-        run: bash tests/run_all.sh
+      # ── ชุดทดสอบ: แยก step ต่อชุด ────────────────────────────────────────
+      # ทำไมต้องแยก: ถ้ารวมเป็น step เดียว (run_all.sh) แล้วล้ม จะเห็นแค่
+      # "Process completed with exit code 1" ซึ่งไม่บอกว่าชุดไหนพัง และ log ของ
+      # runner ต้องล็อกอินถึงจะอ่านได้ — แต่ "ชื่อ step ที่ล้ม" เป็นข้อมูลสาธารณะ
+      # จึงรู้ทันทีโดยไม่ต้องมีสิทธิ์เข้าถึง repo
+      - name: "test: addon_structure"
+        run: python tests/test_addon_structure.py
+      - name: "test: bat_encoding"
+        run: python tests/test_bat_encoding.py
+      - name: "test: docs_links"
+        run: python tests/test_docs_links.py
+      - name: "test: server_utils"
+        run: python tests/test_server_utils.py
+      - name: "test: bridge_logic"
+        run: python tests/test_bridge_logic.py
+      - name: "test: mcp_e2e"
+        run: python tests/test_mcp_e2e.py
+      - name: "test: mesh_lib"
+        run: python tests/test_mesh_lib.py
+      - name: "test: example_character"
+        run: python tests/test_example_character.py
+      - name: "test: thai_house"
+        run: python tests/test_thai_house.py
+      - name: "test: tree_dog"
+        run: python tests/test_tree_dog.py
+      - name: "test: scene"
+        run: python tests/test_scene.py
