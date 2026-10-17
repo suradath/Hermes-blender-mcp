@@ -273,6 +273,32 @@ check("โปรโตคอลไม่ตรง → เตือน", warn is 
 check("คำเตือนบอกสาเหตุที่พบบ่อย (add-on เก่า)", "add-on" in (warn or ""), str(warn))
 check("คำเตือนบอกวิธีแก้ที่ทำได้ทันที", "--install-addon" in (warn or ""), str(warn))
 
+section("[8] --selftest --deep ต้องส่ง deep=True ไปถึงตัวตรวจ")
+
+
+def _fake_selftest(rt, deep=False):          # noqa: ANN001, ARG001
+    _fake_selftest.seen = deep
+    return 0
+
+
+with mock.patch.object(srv, "_selftest", side_effect=_fake_selftest), \
+        mock.patch.object(sys, "argv", ["blender_mcp_server.py", "--selftest", "--deep"]):
+    try:
+        srv.main()
+    except SystemExit:
+        pass
+check("--deep ถูกส่งต่อไปถึง _selftest", getattr(_fake_selftest, "seen", None) is True,
+      str(getattr(_fake_selftest, "seen", None)))
+with mock.patch.object(srv, "_selftest", side_effect=_fake_selftest), \
+        mock.patch.object(sys, "argv", ["blender_mcp_server.py", "--selftest"]):
+    try:
+        srv.main()
+    except SystemExit:
+        pass
+check("ไม่ใส่ --deep → ตรวจแค่พื้นฐาน", getattr(_fake_selftest, "seen", None) is False,
+      str(getattr(_fake_selftest, "seen", None)))
+
+
 print()
 print("=" * 70)
 if failed:

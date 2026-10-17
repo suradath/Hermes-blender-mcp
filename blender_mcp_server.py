@@ -819,6 +819,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--list-tools", action="store_true", help="พิมพ์รายการเครื่องมือแล้วจบ")
     p.add_argument("--selftest", action="store_true",
                    help="เริ่ม Blender จริง เรียกทุกเครื่องมือ แล้วจบ (ใช้ตรวจการติดตั้ง)")
+    p.add_argument("--deep", action="store_true",
+                   help="ใช้คู่กับ --selftest: ตรวจเพิ่มของที่ต้องใช้เครือข่าย/ไฟล์ "
+                        "(ค้น+โหลด Poly Haven แล้วนำเข้าโมเดล · บันทึก .blend)")
     # ⚠️ ใช้ parse_known_args ไม่ใช่ parse_args
     #
     # ไคลเอนต์ MCP หลายตัวเติมอาร์กิวเมนต์ของตัวเองต่อท้ายบรรทัดคำสั่ง
@@ -896,7 +899,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.selftest:
-        return _selftest(rt)
+        return _selftest(rt, deep=bool(getattr(args, "deep", False)))
 
     atexit.register(rt.shutdown)
 
@@ -917,8 +920,11 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _selftest(rt: Runtime) -> int:
-    """เปิด Blender จริงแล้วไล่เรียกทุกเครื่องมือ — ใช้ตรวจการติดตั้ง"""
+def _selftest(rt: Runtime, deep: bool = False) -> int:
+    """เปิด Blender จริงแล้วไล่เรียกทุกเครื่องมือ — ใช้ตรวจการติดตั้ง
+
+    deep=True → ตรวจเพิ่มส่วนที่ต้องใช้เครือข่าย/ไฟล์จริง (Poly Haven + บันทึก .blend)
+    """
     print("── ตรวจการติดตั้ง (selftest) ──")
     try:
         rt.ensure()
@@ -979,6 +985,58 @@ def _selftest(rt: Runtime) -> int:
     except Exception as exc:  # noqa: BLE001
         bad += 1
         print(f"❌ resource file_metadata: {exc}")
+
+    # ── ตรวจเชิงลึก (ต้องใช้เครือข่าย/ไฟล์จริง) ──────────────────────────────
+    if deep:
+        print("── ตรวจเชิงลึก (--deep) ──")
+        # 1) บันทึก .blend ลงโฟลเดอร์ชั่วคราว (ไม่ทับไฟล์ของผู้ใช้)
+        try:
+            target = pathlib.Path(tempfile.gettempdir()) / "Hermes-blender-mcp" / "selftest.blend"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                target.unlink()
+            rt.call("save_blend_file", filepath=str(target))
+            size = target.stat().st_size if target.is_file() else 0
+            if size > 0:
+                print(f"✅ save_blend_file: {target.name} · {size:,} ไบต์")
+            else:
+                bad += 1
+                print(f"❌ save_blend_file: ไม่ได้ไฟล์ ({target})")
+        except Exception as exc:  # noqa: BLE001
+            bad += 1
+            print(f"❌ save_blend_file: {exc}")
+
+        # 2) ค้น + โหลดของฟรีจาก Poly Haven แล้วนำเข้าโมเดล
+        #    (ข้ามอย่างซื่อสัตย์ถ้าเครื่องนี้ต่อเน็ตไม่ได้ — ไม่นับเป็นความล้มเหลว)
+        try:
+            found = rt.call("search_polyhaven", query="chair", asset_type="models", limit=6)
+            assets = found.get("assets") or []
+            print(f"✅ search_polyhaven: เจอ {found.get('total_matching', len(assets))} รายการ")
+            before_objs = ((rt.call("get_scene_hierarchy") or {}).get("totals") or {}).get("objects", 0)
+            # ผลค้นหียงตาม polycount อยู่แล้ว — ลองชิ้นเบา ๆ ก่อน 3 อัน
+            candidates = [a for a in assets if a.get("id")][:3]
+            imported = None
+            last_err = ""
+            for cand in candidates:
+                try:
+                    rt.call("download_polyhaven_asset", asset_id=cand["id"], kind="gltf",
+                            resolution="1k", apply=True, max_mb=25)
+                    imported = cand["id"]
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    last_err = f"{type(exc).__name__}: {str(exc)[:80]}"
+            after_objs = ((rt.call("get_scene_hierarchy") or {}).get("totals") or {}).get("objects", 0)
+            if imported and after_objs > before_objs:
+                print(f"✅ download_polyhaven_asset: {imported} → วัตถุ {before_objs} → {after_objs}")
+            elif imported:
+                bad += 1
+                print(f"❌ download_polyhaven_asset: โหลดได้แต่ไม่มีวัตถุเพิ่ม "
+                      f"({before_objs} → {after_objs})")
+            else:
+                print(f"⏭️  ข้ามการโหลด: ลอง {len(candidates)} ชิ้นแล้วไม่สำเร็จ · {last_err}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"⏭️  ข้ามการทดสอบออนไลน์: {type(exc).__name__}: {str(exc)[:110]}")
+
     rt.shutdown()
     print("── จบ ──")
     return 0 if bad == 0 else 1

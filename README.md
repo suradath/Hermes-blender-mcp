@@ -10,7 +10,8 @@ MCP Server ตัวเดียวที่เชื่อม **Hermes Agent** 
 > - **ไม่ต้อง** ติดตั้ง add-on ใน Blender และ **ไม่ต้อง** `pip install` อะไรลง Blender เลย
 
 [![tests](https://github.com/suradath/Hermes-blender-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/suradath/Hermes-blender-mcp/actions/workflows/tests.yml)
-**สถานะ:** ชุดทดสอบอัตโนมัติ **795 ข้อ (11 ชุด) ผ่านหมด** · ทดสอบกับ Blender 5.2.2 จริงบน Windows 11 แล้ว
+**สถานะ:** ชุดทดสอบอัตโนมัติ **797 ข้อ (11 ชุด) ผ่านหมด** ·
+⭐ **`--selftest` ผ่านครบ 11/11 บน Blender 5.2.2 จริง** (Windows 11, 17 ต.ค. 2026)
 · [ทดสอบอะไรแล้ว / ยังไม่ได้ทดสอบอะไร](#ทดสอบอะไรแล้ว--ยังไม่ได้ทดสอบอะไร)
 
 ![บ้านทรงไทยโพลิกอนที่สร้างจากเรขาคณิตของโปรเจกต์](docs/images/05-thai-house-3q.png)
@@ -225,6 +226,7 @@ run-hermes-blender-mcp.bat --selftest      :: Windows
 ✅ ต่อได้ · Blender 5.2.2
 ✅ get_scene_hierarchy: {"scene": {"name": "Scene"}, ...}
 ✅ collection path: 2 คอลเลกชัน · ตัวอย่าง ['Scene Collection', 'Scene Collection/Collection']
+✅ get_viewport_screenshot: view-1792241515360.png · 46484 ไบต์
 ✅ add_primitive_mesh: {"created": "LPM_Test", "primitive": "cube", ...}
 ✅ modify_object_transform: {"name": "LPM_Test", "after": {...}}
 ✅ set_object_material: {"object": "LPM_Test", "material": "LPM_0.9_0.2_0.2"}
@@ -237,6 +239,16 @@ run-hermes-blender-mcp.bat --selftest      :: Windows
 ```
 
 > 🔒 `--selftest` ใช้ `--factory-startup` = ฉากเริ่มต้น **ไม่แตะไฟล์ `.blend` ของคุณ**
+
+**ตรวจลึกขึ้นอีกขั้น** (ต้องต่ออินเทอร์เน็ต — ตรวจคลัง Poly Haven + การนำเข้าโมเดล + บันทึก `.blend`):
+
+```bat
+run-hermes-blender-mcp.bat --selftest --deep
+```
+
+✅ ควรเห็นเพิ่ม: `✅ save_blend_file: selftest.blend · ... ไบต์` และ
+`✅ download_polyhaven_asset: <ชื่อเก้าอี้> → วัตถุ 2 → 5`
+(ถ้าเครื่องต่อเน็ตไม่ได้ จะขึ้น `⏭️ ข้าม` อย่างซื่อสัตย์ — ไม่นับเป็นความล้มเหลว)
 
 ❌ **ถ้าขึ้น `❌ เปิด Blender ไม่ได้`** → ยังไม่เจอ Blender ให้กลับไปขั้นที่ 3
 
@@ -548,17 +560,17 @@ bash tests/run_all.sh      # รันทุกชุด (ไม่ต้อง�
 | `test_tree_dog.py` | ต้นไม้ + สุนัข: ขาแตะพื้น · พุ่มซ้อนลำต้น · ตาพ้นความกว้างปาก · สมมาตร | 47 |
 | `test_thai_house.py` | บ้านทรงไทย: ทุกชิ้นปิดสนิท · ระดับชั้นต่อกันจริง · ช่อฟ้านั่งบนสัน · หลังคาชัน ≥ 35° | 65 |
 | `test_mesh_lib.py` | เมชละเอียด: ปิดสนิท/ออยเลอร์ 2/ปริมาตรตรงสูตร · สัดส่วนตรงรูป · มือไม่ใหญ่กว่าแขน | 67 |
-| `test_server_utils.py` | หา Blender (รวม Hermes กรอง env) · CLI · อดทนต่ออาร์กิวเมนต์แปลก · ติดตั้ง add-on ให้เอง | 58 |
+| `test_server_utils.py` | หา Blender (รวม Hermes กรอง env) · CLI · อดทนต่ออาร์กิวเมนต์แปลก · ติดตั้ง add-on ให้เอง · `--deep` | 60 |
 | `test_bridge_logic.py` | ตรรกะทุกเครื่องมือ + ด่านความปลอดภัย + การถ่ายภาพ + คลัง Poly Haven (จำลอง + ยิง API จริง) | 164 |
 | `test_mcp_e2e.py` | ครบวงจรจริง: MCP client ทางการ ⇄ เซิร์ฟเวอร์ ⇄ สะพาน (รวมรูปส่งถึงไคลเอนต์) | 56 |
 
-**รวม 795 ข้อ** — ทดสอบด้วยของจริงทุกชั้น ยกเว้นตัว Blender (ใช้ `tests/fake_bpy.py`)
+**รวม 797 ข้อ** — ทดสอบด้วยของจริงทุกชั้น ยกเว้นตัว Blender (ใช้ `tests/fake_bpy.py`)
 
 ### ทดสอบอะไรแล้ว / ยังไม่ได้ทดสอบอะไร
 
 | | สถานะ |
 |---|---|
-| ⭐ **รันบน Blender จริง** — Windows 11 + Blender 5.2.2 · `--selftest` รอบแรก (v1.0.0) ผ่าน 8/9 และจับบั๊ก `Collection.parent` ได้จริง → แก้ใน v1.0.1 | ✅ ยืนยันบางส่วน (รอตรวจซ้ำ) |
+| ⭐ **รันบน Blender จริง** — Windows 11 + Blender 5.2.2 · `--selftest` **ผ่านครบ 11/11** (ฉาก · สร้าง · ย้าย · วัสดุ · รายละเอียด · สคริปต์ · ลบ · เส้นทางคอลเลกชัน · ภาพหน้าจอ · ทรัพยากร) | ✅ **ยืนยันแล้ว** (17 ต.ค. 2026 · รอบแรก v1.0.0 ผ่าน 8/9 และจับบั๊ก `Collection.parent` ได้จริง) |
 | ⭐ **Hermes ตัวจริงเชื่อมต่อได้** — `hermes mcp add` → `✓ Connected! Found 12 tool(s)` | ✅ ยืนยันแล้ว |
 | สื่อสาร MCP (handshake, tool list, สคีมา, เรียกใช้, resource, error) | ✅ MCP client ทางการ (56 ข้อ) |
 | ลิงก์ในเอกสารไม่เสีย | ✅ ตรวจทุก push |
@@ -566,7 +578,8 @@ bash tests/run_all.sh      # รันทุกชุด (ไม่ต้อง�
 | ตรรกะ `bpy` ทุกเครื่องมือ | ✅ กับ `bpy` ปลอมที่เลียนแบบของจริง |
 | stdout สะอาด (ไม่เลอะท่อ JSON-RPC) | ✅ ยืนยัน 0 ไบต์ |
 | ยิง API จริงของ Poly Haven | ✅ ทดสอบแล้ว (ค้น "chair" เจอจริง) |
-| **ทุกเครื่องมือบน Blender จริง** (เช่น โหลด Poly Haven จริง · โหมด viewport) | ❌ ยังไม่ได้ไล่ทดสอบครบ |
+| **โหลด Poly Haven จริง + นำเข้าโมเดลลงฉาก** บน Blender จริง | ❌ ยังไม่ได้ทดสอบ (ทดสอบแค่ตัว API กับตรรกะ) — ใช้ `--selftest --deep` เพื่อตรวจได้ |
+| **โหมด viewport (มีหน้าต่าง) + add-on timer** | ❌ ต้องมีคนนั่งกดในหน้าต่าง Blender |
 | **การเรนเดอร์ · UI · `bpy.app.timers` ของจริง** | ❌ ต้องมี Blender (โหมด timer) |
 
 > เครื่องที่ใช้พัฒนาไม่มี Blender ติดตั้ง จึงทดสอบได้ถึงชั้น "โปรโตคอล + ตรรกะ + การเชื่อมกับ Hermes"
@@ -716,7 +729,7 @@ GitHub มี **508 รีโป** ที่เกี่ยวกับ "blender
 | **รันแบบไม่มีหน้าต่าง/บนเซิร์ฟเวอร์** เป็นหลัก | **โปรเจกต์นี้** (ออกแบบมาเพื่อ `blender -b`) |
 | ไม่ต้องติดตั้ง add-on และไม่ต้อง `pip install` ลง Blender | **โปรเจกต์นี้** (สะพาน stdlib ล้วน) |
 | ใช้ `mcp 2.x` (`MCPServer`) | **โปรเจกต์นี้** |
-| โค้ดเล็กพออ่านจบ + เทสต์เป็นสัญญา (795 ข้อ) + เอกสารไทย | **โปรเจกต์นี้** |
+| โค้ดเล็กพออ่านจบ + เทสต์เป็นสัญญา (797 ข้อ) + เอกสารไทย | **โปรเจกต์นี้** |
 | ให้ AI "รู้" ศัพท์และขั้นตอนของ Blender | ติดสกิลจาก Skills Hub เสริม (trust: community) |
 
 ### 🙏 สิ่งที่ได้เรียนรู้จากตัว 31k★
