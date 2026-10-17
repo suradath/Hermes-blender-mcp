@@ -123,6 +123,60 @@ check("สคริปต์สะพานมีอยู่จริงใน�
 check("สคริปต์สะพานบอกวิธีรันแบบ headless ในเอกสารตัวเอง",
       "blender -b" in (ROOT / "blender_bridge.py").read_text(encoding="utf-8"))
 
+# ===========================================================================
+section("[5] ตัวสร้างไฟล์ .zip สำหรับติดตั้ง (Install from Disk)")
+# ===========================================================================
+sys.path.insert(0, str(ROOT / "tools"))
+bz = None
+try:
+    import build_addon_zip as bz  # noqa: E402
+    check("มีสคริปต์ tools/build_addon_zip.py", True)
+except Exception as exc:  # noqa: BLE001
+    check("มีสคริปต์ tools/build_addon_zip.py", False, str(exc))
+
+if bz is not None:
+    import tempfile  # noqa: E402
+    import zipfile  # noqa: E402
+
+    want_ver = ".".join(str(v) for v in bl_info.get("version", ()))
+    check("อ่านเลขเวอร์ชันจาก bl_info ได้", bz.read_version() == want_ver,
+          f"{bz.read_version()} ≠ {want_ver}")
+    check("ชื่อโฟลเดอร์ add-on ใช้ชื่อที่เอกสารบอก",
+          bz.ADDON_NAME == "blender_mcp_bridge", bz.ADDON_NAME)
+
+    with tempfile.TemporaryDirectory() as td:
+        target = bz.build(pathlib.Path(td))
+        check("ตั้งชื่อไฟล์มีเลขเวอร์ชัน",
+              target.name == f"{bz.ADDON_NAME}-{want_ver}.zip", target.name)
+        with zipfile.ZipFile(target) as z:
+            names = z.namelist()
+            check("zip มี __init__.py ของ add-on",
+                  f"{bz.ADDON_NAME}/__init__.py" in names, str(names))
+            check("⚠️ zip มี blender_bridge.py อยู่ข้างในด้วย "
+                  "(ลืมเมื่อไร add-on หาสะพานไม่เจอทันที)",
+                  f"{bz.ADDON_NAME}/blender_bridge.py" in names, str(names))
+            check("แนบ LICENSE ไปด้วยถ้ามี", any(n.endswith("LICENSE") for n in names), str(names))
+            check("ไม่มีไฟล์ขยะปน (__pycache__/.pyc)",
+                  not any("__pycache__" in n or n.endswith(".pyc") for n in names), str(names))
+            check("zip ผ่านการทดสอบความสมบูรณ์ของตัวเอง", z.testzip() is None)
+            init_in_zip = z.read(f"{bz.ADDON_NAME}/__init__.py").decode("utf-8")
+            check("bl_info อ่านได้จากข้างใน zip จริง",
+                  re.search(r"^bl_info\s*=\s*\{", init_in_zip, re.M) is not None)
+            check("add-on หา blender_bridge.py จากโฟลเดอร์ตัวเองได้ (สำคัญ: ใน zip อยู่ด้วยกัน)",
+                  "ADDON_DIR" in init_in_zip, "ต้องค้นจากโฟลเดอร์ของ add-on")
+
+    # ต้องไม่ปล่อยผ่านถ้าไฟล์ต้นทางขาด
+    saved = bz.MEMBERS
+    try:
+        bz.MEMBERS = [(pathlib.Path("/ไม่มีไฟล์นี้.py"), "x/__init__.py")]
+        try:
+            bz.check_sources()
+            check("ไฟล์ต้นทางขาด → ต้องไม่ปล่อยผ่าน", False, "ไม่เกิดข้อผิดพลาด")
+        except FileNotFoundError:
+            check("ไฟล์ต้นทางขาด → แจ้งชัดเจนไม่ปล่อยผ่าน", True)
+    finally:
+        bz.MEMBERS = saved
+
 print()
 print("=" * 70)
 if failed:

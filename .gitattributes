@@ -1,0 +1,33 @@
+# การจัดการบรรทัด (สำคัญมากสำหรับโปรเจกต์ที่ใช้ทั้ง Windows และ Linux)
+#
+# ปัญหาที่หลีกเลี่ยง: ไฟล์ .bat ที่ได้ CRLF จาก Windows เมื่อ clone บน Linux
+# จะรันไม่ได้ (เจอ \r ในชื่อคำสั่ง) และไฟล์ .sh ที่ได้ LF บน Windows
+# จะรันใน cmd/PowerShell ไม่ได้ — git จึงต้องบังคับให้ทั้งสองฝั่งคงรูปแบบเดิม
+
+* text=auto
+
+# สคริปต์เชลล์/คอนฟิก ต้องเป็น LF เสมอ
+*.sh        text eol=lf
+*.py        text eol=lf
+*.md        text eol=lf
+*.txt       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.json      text eol=lf
+Makefile    text eol=lf
+
+# สคริปต์ Windows ต้องเป็น CRLF เสมอ (cmd.exe ต้องการ)
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# ไฟล์ไบนารี — ห้ามแตะ
+*.png       binary
+*.jpg       binary
+*.ico       binary
+*.zip       binary
+*.blend     binary
+*.exe       binary
+
+# ภาษาในรีโปนี้เป็นไทย/อังกฤษ — ไม่ต้องให้ GitHub นับเป็นภาษาต่างดาว
+linguist-detectable=false

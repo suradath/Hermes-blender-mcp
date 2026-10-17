@@ -3,10 +3,14 @@
 MCP Server (stdio) ที่เชื่อม **Hermes Agent** เข้ากับ **Blender 5.2 LTS** ผ่าน `bpy`
 ให้ AI อ่านฉาก สร้าง/ขยับวัตถุ ใส่สี และรันสคริปต์ได้จริงจากในแชท
 
-> 🎯 **สถานะ:** ทดสอบอัตโนมัติผ่าน **214 ข้อ (4 ชุด)** + **ยืนยันกับ Hermes ตัวจริงแล้ว**
+> 🎯 **สถานะ:** ทดสอบอัตโนมัติผ่าน **293 ข้อ (5 ชุด)** + **ยืนยันกับ Hermes ตัวจริงแล้ว**
 > (`hermes mcp add` → เชื่อมต่อได้ เห็นทั้ง 8 เครื่องมือ)
 > ⏳ **ยังไม่ได้ทดสอบกับ Blender จริง** — เครื่องที่พัฒนาไม่มี Blender ติดตั้ง
 > (ดูหัวข้อ [ทดสอบอะไรแล้ว / ยังไม่ได้ทดสอบอะไร](#ทดสอบอะไรแล้ว--ยังไม่ได้ทดสอบอะไร))
+
+> 📖 **ติดตั้ง:** [คู่มือภาษาไทย (INSTALL.th.md)](INSTALL.th.md) ·
+> [English (INSTALL.md)](INSTALL.md) — ครอบคลุม Windows 11, Linux และ macOS
+> · สัญญาอนุญาต [MIT](LICENSE)
 
 ---
 
@@ -314,12 +318,13 @@ bash tests/run_all.sh
 
 | ชุดทดสอบ | ตรวจอะไร | จำนวน |
 |---|---|---|
-| `test_addon_structure.py` | โครง add-on ตามที่ Blender ต้องการ + ลง timer บน main thread | 34 |
+| `test_addon_structure.py` | โครง add-on + ตัวสร้าง zip ติดตั้ง (Build from Disk) | 46 |
+| `test_docs_links.py` | ลิงก์/anchor ในเอกสารทุกไฟล์ชี้ไปที่มีจริง + คู่มือ 2 ภาษาตรงกัน | 67 |
 | `test_server_utils.py` | ค้นหา Blender (รวมกรณี Hermes กรอง env) · CLI · ตัดพารามิเตอร์ None | 33 |
 | `test_bridge_logic.py` | ตรรกะทุกเครื่องมือ + ด่านความปลอดภัย (ใช้ `bpy` ปลอม) | 103 |
 | `test_mcp_e2e.py` | **ครบวงจรจริง**: MCP client ทางการ ⇄ เซิร์ฟเวอร์ ⇄ สะพาน | 44 |
 
-**รวม 214 ข้อ** ทดสอบด้วยของจริงทุกชั้น ยกเว้นตัว Blender (ใช้ `tests/fake_bpy.py`)
+**รวม 293 ข้อ** ทดสอบด้วยของจริงทุกชั้น ยกเว้นตัว Blender (ใช้ `tests/fake_bpy.py`)
 
 ### ทดสอบอะไรแล้ว / ยังไม่ได้ทดสอบอะไร
 
@@ -327,6 +332,7 @@ bash tests/run_all.sh
 |---|---|
 | ⭐ **Hermes ตัวจริงเชื่อมต่อได้** — `hermes mcp add` → `✓ Connected! Found 8 tool(s)` · `hermes mcp test` → `✓ Connected (1950ms) · ✓ Tools discovered: 8` | ✅ **ยืนยันแล้ว** (ด้วยสะพานจำลอง เพราะเครื่องนี้ไม่มี Blender) |
 | สื่อสาร MCP (handshake, tool list, สคีมา, เรียกใช้, resource, error) | ✅ ทดสอบด้วย MCP client ทางการ (44 ข้อ) |
+| ลิงก์ในเอกสารไม่เสีย (ปัญหาที่พบบ่อยสุดของรีโปสาธารณะ) | ✅ ตรวจทุก push บน GitHub — 33 ลิงก์ใน 5 ไฟล์ |
 | โปรโตคอลสะพาน (token, JSON บรรทัดละคำขอ, ข้อผิดพลาด, ตอบไม่ถูกต้อง) | ✅ ทดสอบผ่านซ็อกเก็ตจริง |
 | ตรรกะ bpy ทุกเครื่องมือ (สร้าง/ขยับ/ลบ/วัสดุ/รันสคริปต์/ด่านตรวจ) | ✅ ทดสอบกับ `bpy` ปลอมที่เลียนแบบของจริง (103 ข้อ) |
 | stdout สะอาด (ไม่มีอะไรเลอะท่อ JSON-RPC) | ✅ ยืนยัน 0 ไบต์ |
@@ -358,12 +364,20 @@ bash tests/run_all.sh
 
 ```
 blender-mcp/
+├── README.md                 ← ภาพรวมสถาปัตยกรรม + เครื่องมือ + บทเรียน
+├── INSTALL.md                ← คู่มือติดตั้ง (อังกฤษ)
+├── INSTALL.th.md             ← คู่มือติดตั้ง (ไทย)
+├── LICENSE                   ← MIT
 ├── blender_mcp_server.py     ← MCP server (รันด้วย Python ของเครื่อง · stdio)
 ├── blender_bridge.py         ← รันใน Blender (stdlib ล้วน · bpy บน main thread)
 ├── blender_addon/__init__.py ← add-on สำหรับโหมดมีหน้าต่าง (timer mode)
 ├── requirements.txt
 ├── install-windows.bat       ← ติดตั้งอัตโนมัติ (Windows 11)
 ├── run-blender-mcp.bat/.sh   ← ตัวเปิดเซิร์ฟเวอร์ / --check / --selftest
+├── tools/
+│   └── build_addon_zip.py    ← สร้าง zip สำหรับติดตั้ง add-on (Install from Disk)
+├── .github/workflows/tests.yml ← รันชุดทดสอบบน GitHub อัตโนมัติ
+├── .gitattributes            ← บังคับ CRLF/LF ให้ .bat/.sh ไม่พังข้ามระบบ
 ├── tests/
 │   ├── run_all.sh            ← รันทุกชุด
 │   ├── fake_bpy.py           ← bpy ปลอมสำหรับทดสอบ
@@ -374,6 +388,23 @@ blender-mcp/
     ├── 01-ติดตั้ง-Windows11.md
     └── 02-Hermes-config.md
 ```
+
+## 10.1 การพัฒนา (Contributing)
+
+```bash
+bash tests/run_all.sh                      # ชุดทดสอบทั้งหมด (ไม่ต้องมี Blender)
+python tools/build_addon_zip.py            # สร้าง zip ของ add-on
+python blender_mcp_server.py --list-tools  # ดูรายการเครื่องมือ
+```
+
+ทุก push จะรันชุดทดสอบบน GitHub อัตโนมัติ
+([`.github/workflows/tests.yml`](.github/workflows/tests.yml)) ทั้ง Python 3.10 และ 3.12
+พร้อมตรวจว่า stdout ว่างตอนสตาร์ต (กันท่อ JSON-RPC ถูกทำให้สกปรกโดยไม่ตั้งใจ)
+
+> 💡 หลังอัปขึ้น GitHub แล้ว ใส่ป้ายสถานะใน README ได้ด้วยบรรทัดนี้ (แทนที่ `<OWNER>/<REPO>`):
+> `[![tests](https://github.com/<OWNER>/<REPO>/actions/workflows/tests.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/tests.yml)`
+
+---
 
 ## 11. อ้างอิง
 

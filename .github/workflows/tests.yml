@@ -1,0 +1,61 @@
+name: tests
+
+# รันชุดทดสอบทั้งหมดบน GitHub ทุกครั้งที่ push/PR
+# ข้อดี: ชุดทดสอบของโปรเจกต์นี้ **ไม่ต้องมี Blender** (ใช้ bpy ปลอม)
+# จึงรันบน runner ธรรมดาได้ และเป็นหลักฐานสาธารณะว่าของยังใช้ได้จริง
+#
+# หลังอัปขึ้น GitHub แล้ว ใส่ป้ายสถานะใน README ได้ด้วยบรรทัดนี้:
+#   [![tests](https://github.com/<OWNER>/<REPO>/actions/workflows/tests.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/tests.yml)
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 = เวอร์ชันต่ำสุดที่ mcp 2.x รองรับ · 3.12 = ตัวที่ใช้ทดสอบจริง
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: ติดตั้งแพ็กเกจ
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: ตรวจไวยากรณ์ทุกไฟล์
+        run: python -m py_compile blender_mcp_server.py blender_bridge.py blender_addon/__init__.py tools/build_addon_zip.py tests/*.py
+
+      - name: ตรวจว่า stdout ว่างตอนสตาร์ต (ท่อ JSON-RPC ต้องสะอาด)
+        run: |
+          # ใช้ $! ไม่ใช่ %1 — GitHub รันเชลล์แบบไม่โต้ตอบ (ไม่มี job control)
+          python blender_mcp_server.py --log-file /tmp/ci.log < /dev/null > /tmp/stdout.txt 2>/tmp/stderr.txt &
+          PID=$!
+          sleep 6
+          kill "$PID" 2>/dev/null || true
+          wait "$PID" 2>/dev/null || true
+          BYTES=$(wc -c < /tmp/stdout.txt)
+          echo "stdout = $BYTES ไบต์"
+          if [ "$BYTES" -ne 0 ]; then
+            echo "❌ มีอะไรเขียนลง stdout — จะทำให้ JSON-RPC พัง:"
+            cat /tmp/stdout.txt
+            exit 1
+          fi
+
+      - name: สร้าง zip ของ add-on (ต้องได้โครงสร้างถูกต้อง)
+        run: python tools/build_addon_zip.py
+
+      - name: รันชุดทดสอบทั้งหมด
+        run: bash tests/run_all.sh
