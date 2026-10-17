@@ -172,7 +172,7 @@ scanned = 0
 for f in sorted(ROOT.rglob("*")):
     if not f.is_file() or f.suffix not in SUFFIXES:
         continue
-    if any(part in SKIP for part in f.parts):
+    if any(part in SKIP or part.startswith(".venv") for part in f.parts):
         continue
     scanned += 1
     for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):

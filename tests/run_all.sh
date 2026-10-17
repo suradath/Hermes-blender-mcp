@@ -47,6 +47,12 @@ for name in "${NAMES[@]}"; do
         printf '❌ ล้มเหลว — ดู %s\n' "$log"
         LOGS+=("$name|fail|$log")
         OVERALL=1
+        # บน GitHub Actions: ประกาศเป็น annotation ไว้ที่หัว run
+        # (อ่านได้ผ่าน API สาธารณะ แม้ไม่มีสิทธิ์ดาวน์โหลด log)
+        if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+            detail=$(grep -E '^[[:space:]]*•' "$log" | head -6 | sed 's/^[[:space:]]*//' | tr '\n' ';' | sed 's/%/%25/g')
+            echo "::error title=${name}::${detail}"
+        fi
     fi
 done
 
