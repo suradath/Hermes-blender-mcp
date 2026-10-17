@@ -4,7 +4,7 @@
 ที่ตั้งใจให้คนอื่นนำไปใช้และต่อยอดได้
 
 > 🇬🇧 **In short (English):** set up with `python -m venv .venv && pip install -r requirements.txt`,
-> run `bash tests/run_all.sh` (5 suites, 343 checks — **no Blender needed**), keep the
+> run `bash tests/run_all.sh` (5 suites, 399 checks — **no Blender needed**), keep the
 > rules in [§4](#4-กฎที่โปรเจกต์นี้บังคับ-และทำไม) (never write to stdout,
 > never call `bpy` off the main thread, errors must be Thai and wrapped in `ToolError`,
 > rotation is in degrees, docs must stay in two-language parity), and open one
@@ -69,7 +69,7 @@ python3 -m venv .venv
 bash tests/run_all.sh
 ```
 
-ต้องผ่านทั้ง **5 ชุด (343 ข้อ)** ก่อนเปิด pull request:
+ต้องผ่านทั้ง **5 ชุด (399 ข้อ)** ก่อนเปิด pull request:
 
 | ชุด | ตรวจอะไร |
 |---|---|
@@ -97,6 +97,7 @@ bash tests/run_all.sh
 | 8 | **เอกสารสองภาษาต้องตรงกัน** และลิงก์ต้องไม่เสีย | เอกสารสองชุดจะเพี้ยนทันทีที่แก้ข้างเดียว — `test_docs_links.py` บังคับ |
 | 9 | **ห้ามลิงก์ไป anchor ที่มีอีโมจิ/เครื่องหมายผสม** — ลิงก์ไปที่ *ไฟล์* แล้วบอกเลขข้อในข้อความ | renderer แต่ละตัว slugify ต่างกัน → ลิงก์พังแบบหาไม่เจอสาเหตุ |
 | 10 | **ตัวเลขในเอกสารต้องตรงกับความจริง** (จำนวนเทสต์, บรรทัด, เวอร์ชัน) | เอกสารที่อ้างเลขเก่าทำให้คนอ่านเชื่อผิด |
+| 11 | **งานที่ต้องเปลี่ยนค่าตั้งชั่วคราว ต้องคืนค่าเดิมเสมอ** — จำก่อน แก้ แล้วคืนใน `finally` และรายงาน "ค่าที่ใช้จริง" ไม่ใช่ค่าหลังคืน | ถ่ายภาพต้องตั้ง `render.filepath`/ความละเอียดชั่วคราว · เคยคืนค่าแล้วรายงานค่าที่คืนไปแล้ว (ผิด) |
 
 ---
 
@@ -143,7 +144,7 @@ def set_object_visibility(name: str, hide_render: bool = False,
 - `tests/test_bridge_logic.py` — เพิ่มส่วนทดสอบตรรกะ (ใช้ `bpy` ปลอม)
 - `tests/test_mcp_e2e.py` — เพิ่มการเรียกจริงในขั้น [3]
 - ⚠️ **อัปเดตจำนวนเครื่องมือที่เทสต์ล็อกไว้** — ทั้งสองไฟล์มีข้อตรวจแบบ
-  `len(names) == 8` ให้แก้เป็นจำนวนใหม่ (นี่คือจุดที่คนลืมบ่อยที่สุด)
+  `len(names) == N` ให้แก้เป็นจำนวนใหม่ (นี่คือจุดที่คนลืมบ่อยที่สุด)
 - ถ้าเครื่องมือใหม่ใช้ API ของ `bpy` ที่ `tests/fake_bpy.py` ยังไม่มี → เพิ่มในของปลอมด้วย
   (ให้เหมือนของจริงที่สุด เช่น ถ้าเปลี่ยนชื่อวัตถุ ต้องย้ายคีย์ในคอลเลกชันให้ด้วย)
 

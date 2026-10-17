@@ -254,35 +254,52 @@ Windows — use double backslashes in JSON:
 **You do not need this** unless you want the AI to work on a Blender window that
 is already open (so you can watch it happen).
 
-### 6a. Build the installable ZIP
+### 6a. Install it with one command (recommended)
+
+The server can copy the add-on into the right folder for you:
+
+```bash
+python blender_mcp_server.py --install-addon --dry-run   # show the target first
+python blender_mcp_server.py --install-addon             # do it
+python blender_mcp_server.py --install-addon --force     # overwrite an older copy
+python blender_mcp_server.py --uninstall-addon           # remove it again
+```
+
+It finds every Blender version you have (Windows / macOS / Linux) and prints the
+path it wrote to. `--check` also reports whether the add-on is installed.
+
+### 6b. Or build an installable ZIP
 
 ```bash
 python tools/build_addon_zip.py          # or: .venv/bin/python tools/…
 ```
 
-Output: `dist/blender_mcp_bridge-<version>.zip`
+Output: `dist/blender_mcp_bridge-<version>.zip` — handy for GitHub Releases.
 
-### 6b. Install it in Blender
+### 6c. Enable it in Blender
 
 1. Open Blender → `Edit > Preferences > Add-ons`
 2. Click the **▼** arrow (top-right) → **Install from Disk…**
 3. Choose `dist/blender_mcp_bridge-1.0.0.zip`
 4. Tick the checkbox next to **"LPM Blender MCP Bridge"**
 
-### 6c. Start the bridge
+### 6d. Start the bridge
 
 1. In the 3D viewport press **`N`** → open the **"Blender MCP"** tab
 2. Press **"Start bridge"** — the panel shows `host:port` (default `127.0.0.1:9876`)
    and a token
 3. Press **"Copy connection command"**
 
-### 6d. Point your agent at it
+### 6e. Point your agent at it
 
 ```bash
 hermes mcp add blender --command "/path/to/.venv/bin/python" --connect-timeout 60 \
   --args /path/to/blender_mcp_server.py --attach 127.0.0.1:9876 --token "<token from the panel>"
 ```
 
+> The bridge also **starts automatically** when you open a `.blend` (toggle
+> "autostart" in the panel) — you can skip pressing the button.
+>
 > The port must match the panel **and** the token must match. Both are just
 > defaults/configurable — the port only ever listens on `127.0.0.1`.
 > Never expose this port to a network: the protocol is unencrypted.
@@ -319,6 +336,7 @@ mcp_blender_get_scene_hierarchy     mcp_blender_get_object_details
 mcp_blender_add_primitive_mesh      mcp_blender_delete_object
 mcp_blender_modify_object_transform mcp_blender_set_object_material
 mcp_blender_execute_blender_script  mcp_blender_save_blend_file
+mcp_blender_get_viewport_screenshot
 ```
 
 Plus two resources: `blender://file/metadata`, `blender://scene/hierarchy`.
@@ -368,7 +386,7 @@ and a log file under your temp directory (`%TEMP%\blender-mcp\` /
 | `Failed to connect: Connection closed` | Almost always `--args` not being last (see step 5), or the server crashing at start-up. Test by hand: `echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}' \| .venv/bin/python blender_mcp_server.py` |
 | Tools never appear in Hermes | The `mcp` package is missing from Hermes's Python (silent disable), or the server was added after the session started → new session or `/reload-mcp` |
 | A tool call times out | Increase `timeout` in the config / `--timeout`. **Blender cannot be interrupted mid-call** — a long loop or render keeps running until it finishes |
-| Add-on appears but says it cannot find `blender_bridge.py` | The two files are not in the same folder — re-read [6b](#6b-install-it-in-blender) or set `BLENDER_MCP_DIR` |
+| Add-on appears but says it cannot find `blender_bridge.py` | The two files are not in the same folder — re-read [6c](#6c-enable-it-in-blender) or set `BLENDER_MCP_DIR` |
 | "refused because it breaks the safety guard" | Intended behaviour; pass `allow_unsafe=true` if you really mean it |
 | Logs | `%TEMP%\blender-mcp\server-*.log` (Windows) or `/tmp/blender-mcp/server-*.log` |
 

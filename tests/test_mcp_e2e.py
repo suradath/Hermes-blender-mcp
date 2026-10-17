@@ -13,6 +13,7 @@ test_mcp_e2e.py — ทดสอบครบวงจร: Hermes/MCP client ⇄ 
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import pathlib
@@ -184,8 +185,9 @@ async def main() -> int:
                     expect = ["get_scene_hierarchy", "add_primitive_mesh",
                               "modify_object_transform", "execute_blender_script",
                               "get_object_details", "delete_object",
-                              "set_object_material", "save_blend_file"]
-                    check("มีเครื่องมือครบ 8 ตัว", len(names) == 8, str(names))
+                              "set_object_material", "save_blend_file",
+                              "get_viewport_screenshot"]
+                    check("มีเครื่องมือครบ 9 ตัว", len(names) == 9, str(names))
                     for want in expect:
                         check(f"มีเครื่องมือ {want}", want in names, str(names))
 
@@ -262,6 +264,35 @@ async def main() -> int:
                     r = await session.call_tool("delete_object",
                                                 {"name": "LPM_E2E", "confirm": True})
                     check("ยืนยันแล้วลบจริง", _payload(r).get("deleted") is True, _text(r)[:150])
+
+                    # ------------------------------------------------ [3.1]
+                    section("[3.1] ให้ AI 'เห็น' ฉาก — รูปต้องส่งถึงไคลเอนต์จริง")
+                    r = await session.call_tool("get_viewport_screenshot", {})
+                    blocks = getattr(r, "content", []) or []
+                    kinds = [getattr(b, "type", None) for b in blocks]
+                    check("ได้ทั้งข้อความและรูปกลับมา (2 บล็อก)",
+                          kinds.count("image") == 1 and kinds.count("text") == 1, str(kinds))
+                    img = next((b for b in blocks if getattr(b, "type", None) == "image"), None)
+                    check("กำหนดชนิดเป็น image/png ให้ไคลเอนต์รู้",
+                          getattr(img, "mime_type", None) == "image/png",
+                          str(getattr(img, "mime_type", None)))
+                    raw = base64.b64decode(getattr(img, "data", "") or "")
+                    check("ข้อมูลรูปเป็น PNG จริง (ตรวจหัวไฟล์)",
+                          raw[:8] == b"\x89PNG\r\n\x1a\n", str(raw[:8]))
+                    check("รูปมีข้อมูลจริง ไม่ใช่ค่าว่าง", len(raw) > 50, f"{len(raw)} ไบต์")
+                    meta = json.loads(next(b.text for b in blocks
+                                           if getattr(b, "type", None) == "text"))
+                    check("บล็อกข้อความบอกโหมดที่ใช้ (render ในโหมด -b)",
+                          meta.get("mode") == "render", str(meta)[:150])
+                    check("บอกกล้องที่ใช้และที่อยู่ไฟล์",
+                          meta.get("camera") == "Camera" and str(meta.get("filepath", "")).endswith(".png"),
+                          str(meta)[:160])
+                    check("บอกขนาดและเวลาที่ใช้",
+                          isinstance(meta.get("bytes"), int) and "seconds" in meta, str(meta)[:150])
+
+                    r = await session.call_tool("get_viewport_screenshot", {"mode": "viewport"})
+                    check("สั่ง viewport ในโหมด -b → ปฏิเสธพร้อมบอกทางออก",
+                          _is_error(r) and "render" in _text(r), _text(r)[:150])
 
                     # ------------------------------------------------ [4]
                     section("[4] ข้อผิดพลาดต้องไม่ทำให้ทั้งระบบล้ม")

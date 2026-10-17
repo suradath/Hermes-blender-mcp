@@ -84,6 +84,93 @@ def load_bridge():
         "หรือตั้งตัวแปรสภาพแวดล้อม BLENDER_MCP_DIR ให้ชี้ไปที่โฟลเดอร์โปรเจกต์")
 
 
+def start_bridge(context=None) -> tuple[bool, str]:
+    """เริ่มสะพาน — ใช้ร่วมกันทั้งปุ่มในแผงและการเปิดอัตโนมัติ
+
+    คืน (สำเร็จ?, ข้อความ) เพื่อให้ผู้เรียกแสดงผลได้ทั้งสองทาง
+    """
+    context = context or bpy.context
+    s = _settings(context)
+    if s.running:
+        return False, "สะพานทำงานอยู่แล้ว"
+    if s.use_token and not s.token:
+        s.token = secrets.token_urlsafe(18)
+    try:
+        bridge = load_bridge()
+    except Exception as exc:  # noqa: BLE001
+        RUNTIME["error"] = str(exc)
+        s.status = "โหลด blender_bridge.py ไม่ได้"
+        return False, str(exc)
+    try:
+        pump = bridge.TimerPump(s.host, s.port, s.token if s.use_token else "", interval=0.05)
+        pump.start()
+        # ลงทะเบียน timer บน main thread — ต้องเรียกจากตรงนี้เท่านั้น
+        RUNTIME["timer"] = pump.drain
+        bpy.app.timers.register(pump.drain, first_interval=0.05, persistent=True)
+        RUNTIME["pump"] = pump
+        RUNTIME["error"] = ""
+        s.running = True
+        s.status = f"ทำงานอยู่ที่ {s.host}:{s.port}" + (" (มี token)" if s.use_token else "")
+        return True, f"เริ่มสะพานที่ {s.host}:{s.port} แล้ว"
+    except Exception as exc:  # noqa: BLE001
+        RUNTIME["error"] = str(exc)
+        s.status = "เริ่มไม่สำเร็จ"
+        return False, f"เริ่มสะพานไม่สำเร็จ: {exc}"
+
+
+def stop_bridge(context=None) -> tuple[bool, str]:
+    """หยุดสะพาน (ใช้ร่วมกันทั้งปุ่มและการปิด add-on)"""
+    context = context or bpy.context
+    s = _settings(context)
+    pump, timer = RUNTIME.get("pump"), RUNTIME.get("timer")
+    if timer is not None:
+        try:
+            if bpy.app.timers.is_registered(timer):
+                bpy.app.timers.unregister(timer)
+        except Exception:
+            pass
+    if pump is not None:
+        try:
+            pump.stop()
+        except Exception:
+            pass
+    RUNTIME.update({"pump": None, "timer": None})
+    s.running = False
+    s.status = "หยุดแล้ว"
+    return True, "หยุดสะพานแล้ว"
+
+
+# --------------------------------------------------------------------- เปิดอัตโนมัติ
+def _autostart_timer():
+    """เรียกโดย bpy.app.timers หลังโหลดไฟล์ — เปิดสะพานให้เองถ้าผู้ใช้เปิดไว้
+
+    ⚠️ ทำเฉพาะเมื่อมีหน้าต่าง Blender: ในโหมด ``-b`` ค่า ``bpy.app.timers``
+    ไม่ทำงานอยู่แล้ว (นี่คือเหตุที่โปรเจกต์นี้เลือก "บล็อกบน main thread" ในโหมด -b
+    แทนที่จะพึ่ง timer) จึงไม่ต้องพยายาม
+    """
+    try:
+        if bpy.app.background:
+            return None
+        s = _settings()
+        if s.autostart and not s.running:
+            ok, msg = start_bridge()
+            print(f"[lpm-bridge] เปิดอัตโนมัติ: {msg}" if ok else f"[lpm-bridge] {msg}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[lpm-bridge] เปิดอัตโนมัติไม่สำเร็จ: {exc}")
+    return None      # ไม่ต้องเรียกซ้ำ
+
+
+def _schedule_autostart(_unused=None):
+    """ต่อท้าย bpy.app.handlers.load_post — ตั้ง timer ไว้คอยเปิดสะพาน"""
+    try:
+        if bpy.app.background:
+            return
+        if not bpy.app.timers.is_registered(_autostart_timer):
+            bpy.app.timers.register(_autostart_timer, first_interval=1.0)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[lpm-bridge] ตั้งเวลเปิดอัตโนมัติไม่สำเร็จ: {exc}")
+
+
 # --------------------------------------------------------------------- ตั้งค่า
 class LPMBridgeSettings(PropertyGroup):
     port: IntProperty(
@@ -96,6 +183,10 @@ class LPMBridgeSettings(PropertyGroup):
         name="ใช้ token", default=True,
         description="ปิดได้ถ้าเครื่องนี้ใช้คนเดียวและอยากให้ตั้งค่าง่าย (ไม่แนะนำ)")
     host: StringProperty(name="โฮสต์", default="127.0.0.1")
+    autostart: BoolProperty(
+        name="เปิดสะพานอัตโนมัติเมื่อโหลดไฟล์", default=True,
+        description="เปิดสะพานให้เองเมื่อเปิดไฟล์ .blend — ทำเฉพาะเมื่อมีหน้าต่าง Blender "
+                    "(โหมด -b ไม่ทำ เพราะ bpy.app.timers ไม่ทำงานในโหมดนั้น)")
     running: BoolProperty(default=False)
     status: StringProperty(default="ยังไม่เริ่ม")
 
@@ -111,41 +202,9 @@ class LPM_OT_start_bridge(Operator):
     bl_description = "เปิดพอร์ตให้ Hermes เชื่อมต่อเข้ามาสั่งงาน Blender"
 
     def execute(self, context):
-        s = _settings(context)
-        if s.running:
-            self.report({"WARNING"}, "สะพานทำงานอยู่แล้ว")
-            return {"CANCELLED"}
-
-        # ให้ token ใหม่อัตโนมัติถ้ายังว่าง (จำไว้ในไฟล์ .blend)
-        if s.use_token and not s.token:
-            s.token = secrets.token_urlsafe(18)
-
-        try:
-            bridge = load_bridge()
-        except Exception as exc:  # noqa: BLE001
-            RUNTIME["error"] = str(exc)
-            s.status = "โหลด blender_bridge.py ไม่ได้"
-            self.report({"ERROR"}, str(exc))
-            return {"CANCELLED"}
-
-        try:
-            pump = bridge.TimerPump(s.host, s.port, s.token if s.use_token else "",
-                                    interval=0.05)
-            pump.start()
-            # ลงทะเบียน timer บน main thread — ต้องเรียกจากตรงนี้เท่านั้น
-            RUNTIME["timer"] = pump.drain
-            bpy.app.timers.register(pump.drain, first_interval=0.05, persistent=True)
-            RUNTIME["pump"] = pump
-            RUNTIME["error"] = ""
-            s.running = True
-            s.status = f"ทำงานอยู่ที่ {s.host}:{s.port}" + (" (มี token)" if s.use_token else "")
-            self.report({"INFO"}, f"เริ่มสะพานที่ {s.host}:{s.port} แล้ว")
-        except Exception as exc:  # noqa: BLE001
-            RUNTIME["error"] = str(exc)
-            s.status = "เริ่มไม่สำเร็จ"
-            self.report({"ERROR"}, f"เริ่มสะพานไม่สำเร็จ: {exc}")
-            return {"CANCELLED"}
-        return {"FINISHED"}
+        ok, msg = start_bridge(context)
+        self.report({"INFO"} if ok else {"ERROR"}, msg)
+        return {"FINISHED"} if ok else {"CANCELLED"}
 
 
 class LPM_OT_stop_bridge(Operator):
@@ -154,23 +213,8 @@ class LPM_OT_stop_bridge(Operator):
     bl_description = "ปิดพอร์ตและยกเลิก timer"
 
     def execute(self, context):
-        s = _settings(context)
-        pump, timer = RUNTIME.get("pump"), RUNTIME.get("timer")
-        if timer is not None:
-            try:
-                if bpy.app.timers.is_registered(timer):
-                    bpy.app.timers.unregister(timer)
-            except Exception:
-                pass
-        if pump is not None:
-            try:
-                pump.stop()
-            except Exception:
-                pass
-        RUNTIME.update({"pump": None, "timer": None})
-        s.running = False
-        s.status = "หยุดแล้ว"
-        self.report({"INFO"}, "หยุดสะพานแล้ว")
+        ok, msg = stop_bridge(context)
+        self.report({"INFO"}, msg)
         return {"FINISHED"}
 
 
@@ -219,6 +263,7 @@ class LPM_PT_bridge(Panel):
         col = layout.column()
         col.prop(s, "host")
         col.prop(s, "port")
+        col.prop(s, "autostart")
         col.prop(s, "use_token")
         if s.use_token:
             col.prop(s, "token", text="Token")
@@ -256,18 +301,23 @@ def register():
     for cls in CLASSES:
         bpy.utils.register_class(cls)
     bpy.types.Scene.lpm_bridge = bpy.props.PointerProperty(type=LPMBridgeSettings)
+    # เปิดสะพานให้เองเมื่อโหลดไฟล์ (ถ้าผู้ใช้เปิดตัวเลือกไว้ และมีหน้าต่าง Blender)
+    if _schedule_autostart not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(_schedule_autostart)
     print("[lpm-bridge] add-on พร้อมใช้งาน — ดูแผงที่ View3D > Sidebar > Blender MCP")
 
 
 def unregister():
+    # ปิดสะพานเสมอเมื่อปิด add-on (ไม่ทิ้งพอร์ต/เธรดค้าง)
     try:
-        prefs_scene = bpy.context.scene
-        if getattr(prefs_scene, "lpm_bridge", None) is not None:
-            pump, timer = RUNTIME.get("pump"), RUNTIME.get("timer")
-            if timer is not None and bpy.app.timers.is_registered(timer):
-                bpy.app.timers.unregister(timer)
-            if pump is not None:
-                pump.stop()
+        stop_bridge()
+    except Exception:
+        pass
+    try:
+        if _schedule_autostart in bpy.app.handlers.load_post:
+            bpy.app.handlers.load_post.remove(_schedule_autostart)
+        if bpy.app.timers.is_registered(_autostart_timer):
+            bpy.app.timers.unregister(_autostart_timer)
     except Exception:
         pass
     RUNTIME.update({"pump": None, "timer": None})

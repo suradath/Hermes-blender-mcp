@@ -106,7 +106,7 @@ for topic, kw in (("วิธีรันเทสต์", "run_all.sh"),
                   ("ห้ามเรียก bpy ข้ามเธรด", "thread"),
                   ("ต้องห่อ error ด้วย ToolError", "ToolError"),
                   ("สูตรเพิ่มเครื่องมือใหม่", "@srv.tool"),
-                  ("แก้จำนวนเครื่องมือในเทสต์ด้วย", "len(names) == 8"),
+                  ("แก้จำนวนเครื่องมือในเทสต์ด้วย", "len(names) =="),
                   ("รายงานบั๊ก", "รายงานบั๊ก"),
                   ("ความปลอดภัย/ไม่ใช่ sandbox", "sandbox")):
     check(f"CONTRIBUTING สอนเรื่อง «{topic}»", kw in contrib, kw)

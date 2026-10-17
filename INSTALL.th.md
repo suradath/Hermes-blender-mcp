@@ -246,35 +246,52 @@ mcp_servers:
 
 **ไม่จำเป็น** ถ้าไม่ได้อยากให้ AI ทำงานบน Blender ที่เปิดหน้าต่างค้างไว้ (เพื่อดูภาพขณะทำ)
 
-### 6ก. สร้างไฟล์ .zip ที่พร้อมติดตั้ง
+### 6ก. ติดตั้งด้วยคำสั่งเดียว (แนะนำ)
+
+เซิร์ฟเวอร์คัดลอก add-on ไปไว้ในโฟลเดอร์ของ Blender ให้เอง:
+
+```powershell
+.\.venv\Scripts\python.exe blender_mcp_server.py --install-addon --dry-run  # ดูปลายทางก่อน
+.\.venv\Scripts\python.exe blender_mcp_server.py --install-addon            # ติดตั้งจริง
+.\.venv\Scripts\python.exe blender_mcp_server.py --install-addon --force    # เขียนทับของเก่า
+.\.venv\Scripts\python.exe blender_mcp_server.py --uninstall-addon          # ถอนออก
+```
+
+มันหาทุกเวอร์ชันของ Blender ที่คุณมี (Windows / macOS / Linux) แล้วบอกว่าคัดลอกไปที่ไหน
+· `--check` ก็รายงานสถานะ add-on ให้ด้วย
+
+### 6ข. หรือสร้างไฟล์ .zip เอง
 
 ```powershell
 .\.venv\Scripts\python.exe tools\build_addon_zip.py
 ```
 
-ได้ไฟล์ `dist\blender_mcp_bridge-<เวอร์ชัน>.zip`
+ได้ไฟล์ `dist\blender_mcp_bridge-<เวอร์ชัน>.zip` — เหมาะกับแนบใน GitHub Releases
 
-### 6ข. ติดตั้งใน Blender
+### 6ค. เปิดใช้ใน Blender
 
 1. เปิด Blender → `Edit > Preferences > Add-ons`
 2. กดลูกศร **▼** (มุมขวาบน) → **Install from Disk…**
 3. เลือกไฟล์ `blender_mcp_bridge-1.0.0.zip`
 4. ติ๊กถูกที่ **"LPM Blender MCP Bridge"**
 
-### 6ค. เริ่มสะพาน
+### 6ง. เริ่มสะพาน
 
 1. ในมุมมอง 3D กด **`N`** → เปิดแท็บ **"Blender MCP"**
 2. กด **"เริ่มสะพาน (Start bridge)"** — แผงจะแสดง `host:port` (ค่าปริยาย
    `127.0.0.1:9876`) และ token
 3. กด **"คัดลอกคำสั่งเชื่อมต่อ"**
 
-### 6ง. ให้ไคลเอนต์ต่อเข้ามา
+### 6จ. ให้ไคลเอนต์ต่อเข้ามา
 
 ```powershell
 hermes mcp add blender --command "C:\path\.venv\Scripts\python.exe" --connect-timeout 60 `
   --args C:\path\blender_mcp_server.py --attach 127.0.0.1:9876 --token "<token จากแผง>"
 ```
 
+> สะพานจะ **เปิดให้เองอัตโนมัติ**เมื่อเปิดไฟล์ `.blend` (ปิด/เปิดได้ที่ติ๊ก
+> "เปิดสะพานอัตโนมัติ" ในแผง) — ไม่ต้องกดปุ่มเองก็ได้
+>
 > พอร์ตต้องตรงกับที่แผงแสดง **และ** token ต้องตรงกัน
 > พอร์ตนี้ฟังเฉพาะ `127.0.0.1` เท่านั้น — **ห้ามเปิดออกเครือข่าย** เพราะไม่ได้เข้ารหัส
 > ใครต่อได้ก็สั่ง Blender ของคุณได้
@@ -311,6 +328,7 @@ mcp_blender_get_scene_hierarchy     mcp_blender_get_object_details
 mcp_blender_add_primitive_mesh      mcp_blender_delete_object
 mcp_blender_modify_object_transform mcp_blender_set_object_material
 mcp_blender_execute_blender_script  mcp_blender_save_blend_file
+mcp_blender_get_viewport_screenshot
 ```
 
 และมี 2 ทรัพยากร: `blender://file/metadata`, `blender://scene/hierarchy`
@@ -358,7 +376,7 @@ hermes mcp remove blender        # หรือลบบรรทัดใน co
 | `Failed to connect: Connection closed` | เกือบทุกครั้งคือ `--args` ไม่ได้อยู่ท้ายสุด (ดูข้อ 5) หรือเซิร์ฟเวอร์ล้มตอนเริ่ม — ทดสอบเองด้วยการป้อน JSON `initialize` ทาง stdin |
 | Hermes ไม่เห็นเครื่องมือเลย | Python ของ Hermes ไม่มีแพ็กเกจ `mcp` (ปิดเงียบ ๆ) หรือเพิ่มเซิร์ฟเวอร์หลังเซสชันเริ่ม → เริ่มเซสชันใหม่ หรือ `/reload-mcp` |
 | เรียกเครื่องมือแล้วหมดเวลา | เพิ่ม `timeout` ใน config / `--timeout` — **Blender ถูกสั่งหยุดกลางคันไม่ได้** ลูปยาวหรือเรนเดอร์จะทำต่อจนจบ |
-| add-on ขึ้นแต่บอกหาสะพานไม่เจอ | สองไฟล์ไม่ได้อยู่โฟลเดอร์เดียวกัน — ดูข้อ 6ข ใหม่ หรือตั้ง `BLENDER_MCP_DIR` |
+| add-on ขึ้นแต่บอกหาสะพานไม่เจอ | สองไฟล์ไม่ได้อยู่โฟลเดอร์เดียวกัน — ดูข้อ 6ค ใหม่ หรือตั้ง `BLENDER_MCP_DIR` |
 | ขึ้น "ถูกปฏิเสธเพราะฝ่าด่านความปลอดภัย" | เป็นไปตามการออกแบบ — ถ้าตั้งใจจริงส่ง `allow_unsafe=true` |
 | ดูบันทึก | `%TEMP%\blender-mcp\server-*.log` (Windows) หรือ `/tmp/blender-mcp/server-*.log` |
 

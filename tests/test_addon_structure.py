@@ -177,6 +177,33 @@ if bz is not None:
     finally:
         bz.MEMBERS = saved
 
+# ===========================================================================
+section("[6] เปิดสะพานอัตโนมัติ + ปิดให้เรียบร้อย")
+# ===========================================================================
+check("มีตัวเลือก autostart ให้ผู้ใช้เปิด/ปิด", "autostart" in src and "BoolProperty" in src)
+check("ค่าเริ่มต้นเปิดไว้ (แต่ทำเฉพาะเมื่อมีหน้าต่าง)",
+      re.search(r'name="เปิดสะพานอัตโนมัติ[^"]*",\s*default=True', src) is not None,
+      "default=True แต่ต้องมีด่าน bpy.app.background")
+check("⚠️ กันโหมด -b: ตรวจ bpy.app.background ก่อนใช้ timer",
+      "bpy.app.background" in src and "timers.register(_autostart_timer" in src,
+      "โหมด -b timers ไม่ทำงาน — พยายามไปก็เสียเปล่า")
+check("ผูกกับเหตุการณ์โหลดไฟล์ (load_post)",
+      "bpy.app.handlers.load_post" in src)
+check("ถอด handler ตอนปิด add-on (ไม่ทิ้ง handler ค้าง)",
+      "load_post.remove(_schedule_autostart)" in src)
+check("ยกเลิก timer ของ autostart ตอนปิด add-on",
+      "timers.unregister(_autostart_timer)" in src)
+check("ปิดสะพานเสมอตอนปิด add-on (ไม่ทิ้งพอร์ต/เธรดค้าง)",
+      re.search(r"def unregister\(\):\s*\n(?:.*\n)*?\s*stop_bridge\(\)", src) is not None,
+      "unregister() ต้องเรียก stop_bridge()")
+check("ตรรกะเริ่ม/หยุดสะพานอยู่ในฟังก์ชันร่วม ไม่ซ้ำใน operator",
+      "def start_bridge(" in src and "def stop_bridge(" in src
+      and src.count("TimerPump(") == 1,
+      "ต้องมีที่เดียว ไม่งั้นสองทางจะเพี้ยนไม่ตรงกัน")
+check("ผู้ดำเนินการเรียกฟังก์ชันร่วม (ไม่คัดลอกโค้ด)",
+      "start_bridge(context)" in src and "stop_bridge(context)" in src)
+check("แผงมีติ๊ก autostart ให้เห็น", 'prop(s, "autostart")' in src)
+
 print()
 print("=" * 70)
 if failed:

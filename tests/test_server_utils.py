@@ -196,6 +196,73 @@ check("มี token สุ่มให้ทุกครั้งที่เป
       proc.token != srv.BlenderProcess(pathlib.Path("/tmp/x"), p).token,
       f"ความยาว {len(proc.token)}")
 
+# ===========================================================================
+section("[6] ติดตั้ง add-on ให้เอง (แทนการคัดลอกไฟล์ด้วยมือ)")
+# ===========================================================================
+import tempfile  # noqa: E402
+
+with mock.patch.object(srv, "find_blender", return_value=(None, "หาไม่เจอ")):
+    # ไม่มี Blender เลย → ต้องบอกให้ชัดว่าต้องทำอะไร ไม่ใช่ล้มเงียบ ๆ
+    with tempfile.TemporaryDirectory() as td:
+        with mock.patch.object(srv.platform, "system", return_value="Linux"), \
+                mock.patch("pathlib.Path.home", return_value=pathlib.Path(td)):
+            try:
+                srv.install_addon()
+                check("ไม่มีเวอร์ชัน Blender → ต้องไม่ผ่านเงียบ ๆ", False, "ไม่เกิดข้อผิดพลาด")
+            except srv.BridgeError as exc:
+                check("ไม่มีเวอร์ชัน Blender → บอกทางแก้", "เปิด Blender" in str(exc), str(exc)[:120])
+                check("ข้อความบอกที่อยู่ปลายทางให้คัดลอกเอง",
+                      "scripts" in str(exc) and "blender_mcp_bridge" in str(exc), str(exc)[:200])
+
+    with tempfile.TemporaryDirectory() as td:
+        home = pathlib.Path(td)
+        (home / ".config" / "blender" / "5.2").mkdir(parents=True)
+        with mock.patch.object(srv.platform, "system", return_value="Linux"), \
+                mock.patch("pathlib.Path.home", return_value=home):
+            check("หาเวอร์ชันจากโฟลเดอร์ค่าตั้งได้", srv.blender_versions() == ["5.2"],
+                  str(srv.blender_versions()))
+            dry = srv.install_addon(dry_run=True)
+            target = home / ".config/blender/5.2/scripts/addons/blender_mcp_bridge"
+            check("dry-run: ไม่เขียนไฟล์จริง", not target.exists())
+            check("dry-run: บอกปลายทางให้ตรวจก่อน", str(target) in dry["results"][0]["target"])
+
+            out = srv.install_addon()
+            check("ติดตั้งจริง: ได้ทั้งสองไฟล์ที่ต้องมี",
+                  (target / "__init__.py").is_file() and (target / "blender_bridge.py").is_file(),
+                  str(list(target.iterdir())) if target.exists() else "ไม่มีโฟลเดอร์")
+            check("⚠️ คัดลอกไฟล์ตรงกับต้นทางเป๊ะ (ไม่ใช่ของเก่า)",
+                  (target / "blender_bridge.py").read_bytes() == (ROOT / "blender_bridge.py").read_bytes())
+            check("บอกขั้นต่อไปให้ผู้ใช้ (ไปเปิด add-on ใน Blender)",
+                  "Add-ons" in out["next"], out["next"])
+
+            again = srv.install_addon()
+            check("ติดตั้งซ้ำ → บอกว่าเขียนทับของเดิม ไม่เงียบ",
+                  again["results"][0].get("replaced") is True, str(again["results"][0]))
+
+            rm = srv.uninstall_addon()
+            check("ถอนการติดตั้ง: ลบโฟลเดอร์จริง", not target.exists() and str(target) in rm["removed"])
+            check("ถอนเมื่อไม่มีอยู่ → ไม่ระเบิด", srv.uninstall_addon()["removed"] == [])
+
+            # macOS/Windows ต้องชี้คนละที่
+            with mock.patch.object(srv.platform, "system", return_value="Darwin"):
+                check("macOS → ใช้ ~/Library/Application Support/Blender",
+                      "Application Support" in str(srv._blender_config_root()),
+                      str(srv._blender_config_root()))
+            with mock.patch.object(srv.platform, "system", return_value="Windows"), \
+                    mock.patch.dict(os.environ, {"APPDATA": "C:/Users/x/AppData/Roaming"}, clear=True):
+                check("Windows → ใช้ %APPDATA%\Blender Foundation",
+                      "Blender Foundation" in str(srv._blender_config_root()),
+                      str(srv._blender_config_root()))
+
+section("[7] ตรวจเวอร์ชันโปรโตคอล (จับ add-on เก่าที่ค้างอยู่)")
+check("โปรโตคอลตรงกัน → ไม่มีคำเตือน", srv.check_bridge_protocol({"protocol": 1}) is None)
+check("ไม่มีข้อมูล → ไม่เตือน (สะพานรุ่นเก่าที่ไม่ส่งมาก็ยังใช้ได้)",
+      srv.check_bridge_protocol({}) is None and srv.check_bridge_protocol(None) is None)
+warn = srv.check_bridge_protocol({"protocol": 0, "bridge": "0.9.0"})
+check("โปรโตคอลไม่ตรง → เตือน", warn is not None and "v0" in warn, str(warn))
+check("คำเตือนบอกสาเหตุที่พบบ่อย (add-on เก่า)", "add-on" in (warn or ""), str(warn))
+check("คำเตือนบอกวิธีแก้ที่ทำได้ทันที", "--install-addon" in (warn or ""), str(warn))
+
 print()
 print("=" * 70)
 if failed:

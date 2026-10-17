@@ -46,13 +46,19 @@ import threading
 import time
 
 import anyio
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Image, MCPServer
 from mcp.server.mcpserver.exceptions import ResourceError, ToolError
+from mcp.types import TextContent
 
 HERE = pathlib.Path(__file__).resolve().parent
 BRIDGE_SCRIPT = HERE / "blender_bridge.py"
 SERVER_VERSION = "1.0.0"
 MIN_BLENDER = (4, 0)          # ใช้ API ที่มีมาตั้งแต่ 4.0 (5.2 คือเป้าหมาย)
+# เวอร์ชันโปรโตคอลระหว่างเซิร์ฟเวอร์กับสะพาน — ต้องตรงกัน ไม่งั้นมักแปลว่า
+# add-on ที่ติดตั้งไว้เป็นเวอร์ชันเก่า (bridge เก่าคุยกับเซิร์ฟเวอร์ใหม่)
+EXPECTED_BRIDGE_PROTOCOL = 1
+# เพดานขนาดรูปที่ส่งกลับให้ AI — ใหญ่กว่านี้จะกินบริบท/เวลาเกินคุ้ม
+MAX_IMAGE_BYTES = 4 * 1024 * 1024
 
 
 # ===========================================================================
@@ -85,6 +91,96 @@ class Log:
 
 
 log = Log()
+
+
+# ===========================================================================
+#  ติดตั้ง add-on ให้เอง (ตัดขั้นตอนคัดลอกไฟล์ด้วยมือออก)
+# ===========================================================================
+
+ADDON_DIRNAME = "blender_mcp_bridge"
+
+
+def _blender_config_root() -> pathlib.Path | None:
+    """ที่ที่ Blender เก็บค่าตั้ง/add-on ในเครื่องนี้"""
+    home = pathlib.Path.home()
+    if platform.system() == "Windows":
+        base = os.environ.get("APPDATA") or str(home / "AppData" / "Roaming")
+        return pathlib.Path(base) / "Blender Foundation" / "Blender"
+    if platform.system() == "Darwin":
+        return home / "Library" / "Application Support" / "Blender"
+    base = os.environ.get("XDG_CONFIG_HOME") or str(home / ".config")
+    return pathlib.Path(base) / "blender"
+
+
+def blender_versions(explicit: str = "") -> list[str]:
+    """เวอร์ชัน Blender ที่ควรติดตั้ง add-on ให้ (ใหม่สุดก่อน)
+
+    ดูจาก 2 ทาง: โฟลเดอร์ค่าตั้งที่มีอยู่จริง และชื่อโฟลเดอร์ของโปรแกรม Blender
+    (เช่น `C:\\Program Files\\Blender Foundation\\Blender 5.2` → "5.2")
+    """
+    found: list[str] = []
+    root = _blender_config_root()
+    if root and root.is_dir():
+        found += [p.name for p in root.iterdir() if p.is_dir() and re.match(r"^\d+\.\d+", p.name)]
+    exe, _ = find_blender(explicit)
+    if exe is not None:
+        m = re.search(r"(\d+\.\d+)", str(exe))
+        if m:
+            found.append(m.group(1))
+    return sorted(dict.fromkeys(found), key=_version_key, reverse=True)
+
+
+def install_addon(explicit_blender: str = "", dry_run: bool = False,
+                  force: bool = False) -> dict:
+    """คัดลอก add-on ไปไว้ในโฟลเดอร์ addons ของ Blender ทุกเวอร์ชันที่พบ"""
+    sources = {"__init__.py": HERE / "blender_addon" / "__init__.py",
+               "blender_bridge.py": HERE / "blender_bridge.py"}
+    missing = [str(p) for p in sources.values() if not p.is_file()]
+    if missing:
+        raise BridgeError("ไฟล์ต้นทางของ add-on ไม่ครบ:\n  - " + "\n  - ".join(missing))
+
+    root = _blender_config_root()
+    versions = blender_versions(explicit_blender)
+    if not versions:
+        raise BridgeError(
+            "ไม่พบเวอร์ชันของ Blender — ยังไม่เคยเปิด Blender บนเครื่องนี้?\n"
+            f"  เปิด Blender หนึ่งครั้ง แล้วลองใหม่ หรือคัดลอกไฟล์เองไปที่:\n"
+            f"  {root / '<เวอร์ชัน>' / 'scripts' / 'addons' / ADDON_DIRNAME}{os.sep}\n"
+            "  (ดูขั้นตอนใน INSTALL.md หัวข้อ add-on)")
+
+    results = []
+    for ver in versions:
+        target = (root or pathlib.Path(".")) / ver / "scripts" / "addons" / ADDON_DIRNAME
+        if dry_run:
+            results.append({"version": ver, "target": str(target), "installed": False,
+                            "dry_run": True})
+            continue
+        if target.exists() and not force:
+            # เขียนทับได้ แต่บอกให้รู้ (มี add-on ของเราเวอร์ชันก่อนอยู่)
+            results.append({"version": ver, "target": str(target), "installed": True,
+                            "replaced": True})
+        else:
+            results.append({"version": ver, "target": str(target), "installed": True})
+        target.mkdir(parents=True, exist_ok=True)
+        for name, src in sources.items():
+            shutil.copy2(src, target / name)
+    return {"addon": ADDON_DIRNAME, "versions": versions, "results": results,
+            "next": "เปิด Blender > Edit > Preferences > Add-ons > ติ๊ก 'LPM Blender MCP Bridge'"
+                    " (หรือเปิดใช้ auto-start ในแผง)"}
+
+
+def uninstall_addon(explicit_blender: str = "") -> dict:
+    """ลบ add-on ที่ติดตั้งไว้ (ทุกเวอร์ชันที่พบ)"""
+    root = _blender_config_root()
+    removed, not_found = [], []
+    for ver in blender_versions(explicit_blender):
+        target = (root or pathlib.Path(".")) / ver / "scripts" / "addons" / ADDON_DIRNAME
+        if target.is_dir():
+            shutil.rmtree(target)
+            removed.append(str(target))
+        else:
+            not_found.append(str(target))
+    return {"removed": removed, "not_found": not_found}
 
 
 # ===========================================================================
@@ -391,6 +487,19 @@ def build_server(cfg: argparse.Namespace) -> tuple[MCPServer, "Runtime"]:
     return srv, rt
 
 
+def check_bridge_protocol(info: dict | None) -> str | None:
+    """คืนข้อความเตือนถ้าโปรโตคอลของสะพานไม่ตรงกับที่เซิร์ฟเวอร์คาด (None = ปกติ)
+
+    แยกเป็นฟังก์ชันบริสุทธิ์เพื่อทดสอบได้โดยไม่ต้องเปิด Blender
+    """
+    proto = (info or {}).get("protocol")
+    if proto is None or proto == EXPECTED_BRIDGE_PROTOCOL:
+        return None
+    return (f"สะพานเป็นโปรโตคอล v{proto} แต่เซิร์ฟเวอร์นี้คาดว่า v{EXPECTED_BRIDGE_PROTOCOL} "
+            f"— มักเกิดจาก add-on ที่ติดตั้งไว้เป็นเวอร์ชันเก่า "
+            f"แก้ด้วย: blender_mcp_server.py --install-addon --force")
+
+
 class Runtime:
     """ถือการเชื่อมต่อกับ Blender — เปิด Blender ตอนใช้ครั้งแรก (lazy)"""
 
@@ -436,6 +545,9 @@ class Runtime:
             self.client.port = self.proc.port or 0
             self.client.token = self.proc.token
             self.client.connect(timeout=30)
+            warn = check_bridge_protocol(self.client.info)
+            if warn:
+                log(f"⚠️  {warn}")
             log(f"พร้อมใช้งาน · Blender {self.client.info.get('blender')} · "
                 f"ไฟล์ {self.client.info.get('filepath') or '(ยังไม่บันทึก)'}")
             return self.client
@@ -553,6 +665,44 @@ def register_tools(srv: MCPServer, rt: Runtime) -> None:
         return await _run(lambda: rt.call("save_blend_file", filepath=filepath))
 
     @srv.tool()
+    async def get_viewport_screenshot(filepath: str = "", width: int = 0,
+                                      height: int = 0, mode: str = "auto",
+                                      camera: str = "") -> list[TextContent | Image]:
+        """Render a picture of the current view and return it so you can LOOK at
+        the scene, together with a JSON block (path, size, engine, camera). Use
+        this to check your own work after adding or moving objects.
+
+        mode 'auto' picks 'render' when Blender runs without a window (-b) and
+        'viewport' when a Blender window is open. 'render' needs a camera in the
+        scene; 'viewport' needs an open 3D viewport. width/height override the
+        resolution (0 = keep the scene's settings, which are restored afterwards)."""
+        res = await _run(lambda: rt.call("get_viewport_screenshot", filepath=filepath,
+                                         width=width, height=height, mode=mode,
+                                         camera=camera))
+        meta = dict(res or {})
+        source = pathlib.Path(str(meta.get("filepath", "")))
+        blocks: list[TextContent | Image] = [
+            TextContent(type="text", text=json.dumps(meta, ensure_ascii=False, indent=2))]
+
+        # ⚠️ ต้องกัน 2 กรณี: อ่านไฟล์ไม่ได้ (Blender คนละเครื่อง) และไฟล์ใหญ่เกิน
+        try:
+            size = source.stat().st_size
+        except OSError:
+            blocks[0] = TextContent(type="text", text=json.dumps(
+                {**meta, "warning": "อ่านไฟล์รูปไม่ได้ — ถ้า Blender อยู่คนละเครื่องกับ "
+                                    "เซิร์ฟเวอร์ ระบบจะส่งได้แค่ข้อมูล ไม่ส่งรูป"},
+                ensure_ascii=False, indent=2))
+            return blocks
+        if size > MAX_IMAGE_BYTES:
+            blocks[0] = TextContent(type="text", text=json.dumps(
+                {**meta, "warning": f"รูปใหญ่เกินกำหนด ({size:,} ไบต์ > {MAX_IMAGE_BYTES:,}) "
+                                    f"จึงไม่ส่งกลับ — ลด width/height แล้วลองใหม่"},
+                ensure_ascii=False, indent=2))
+            return blocks
+        blocks.append(Image(path=source))
+        return blocks
+
+    @srv.tool()
     async def execute_blender_script(code: str, allow_unsafe: bool = False,
                                      return_variables: str = "result") -> dict:
         """Run raw bpy Python inside Blender and return stdout, the value of the
@@ -623,6 +773,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--headless-safe-startup", action="store_true",
                    help="อย่าใส่ไฟล์ .blend ในบรรทัดคำสั่ง (ใช้เมื่อพาธมีปัญหากับ Blender)")
     p.add_argument("--check", action="store_true", help="ตรวจว่าเจอ Blender ไหม แล้วจบ")
+    p.add_argument("--install-addon", action="store_true",
+                   help="คัดลอก add-on ไปไว้ในโฟลเดอร์ของ Blender ให้เอง แล้วจบ")
+    p.add_argument("--uninstall-addon", action="store_true",
+                   help="ลบ add-on ที่ติดตั้งไว้")
+    p.add_argument("--dry-run", action="store_true",
+                   help="กับ --install-addon: บอกว่าจะเขียนที่ไหน แต่ไม่เขียนจริง")
+    p.add_argument("--force", action="store_true",
+                   help="กับ --install-addon: เขียนทับของเดิม")
     p.add_argument("--list-tools", action="store_true", help="พิมพ์รายการเครื่องมือแล้วจบ")
     p.add_argument("--selftest", action="store_true",
                    help="เริ่ม Blender จริง เรียกทุกเครื่องมือ แล้วจบ (ใช้ตรวจการติดตั้ง)")
@@ -655,10 +813,39 @@ def main(argv: list[str] | None = None) -> int:
         log("    มักเกิดจากไคลเอนต์ MCP เติมอาร์กิวเมนต์ของตัวเองต่อท้ายบรรทัดคำสั่ง "
             "(ถ้าไม่ตั้งใจ ให้ตรวจ config — โดยเฉพาะลำดับ --args ที่ต้องอยู่ท้ายสุด)")
 
+    if args.install_addon or args.uninstall_addon:
+        try:
+            if args.uninstall_addon:
+                out = uninstall_addon(args.blender)
+                for path in out["removed"]:
+                    print(f"🗑️  ลบแล้ว: {path}")
+                for path in out["not_found"]:
+                    print(f"•  ไม่มีอยู่: {path}")
+                if not out["removed"]:
+                    print("ไม่พบ add-on ที่ติดตั้งไว้")
+            else:
+                out = install_addon(args.blender, dry_run=args.dry_run, force=args.force)
+                verb = "จะติดตั้งที่" if args.dry_run else "ติดตั้งแล้วที่"
+                for r in out["results"]:
+                    mark = "⚠️ เขียนทับของเดิม " if r.get("replaced") else ""
+                    print(f"✅ {verb} (Blender {r['version']}): {mark}{r['target']}")
+                print(f"\n👉 {out['next']}")
+            return 0
+        except BridgeError as exc:
+            print(f"❌ {exc}", file=sys.stderr)
+            return 1
+
     if args.check:
         found, how = find_blender(args.blender)
         print(f"Blender: {found if found else 'หาไม่เจอ'} ({how})")
         print(f"สคริปต์สะพาน: {BRIDGE_SCRIPT} {'✅' if BRIDGE_SCRIPT.is_file() else '❌ ไม่พบ'}")
+        root = _blender_config_root()
+        states = []
+        for ver in blender_versions(args.blender):
+            target = (root or pathlib.Path(".")) / ver / "scripts" / "addons" / ADDON_DIRNAME
+            states.append(f"{ver}: {'ติดตั้งแล้ว' if target.is_dir() else 'ยังไม่ได้ติดตั้ง'}")
+        print(f"Add-on: {' · '.join(states) if states else 'ไม่พบเวอร์ชัน Blender (ยังไม่เคยเปิด?)'}")
+        print("        ติดตั้งด้วย: python blender_mcp_server.py --install-addon")
         return 0 if found else 1
 
     srv, rt = build_server(args)

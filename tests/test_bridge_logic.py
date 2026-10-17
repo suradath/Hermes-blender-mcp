@@ -303,7 +303,7 @@ check("hello → บอกว่ารันแบบ background", r["result"]["
 
 r = br.handle_message({"id": 9, "method": "list_tools"})
 names = [t["name"] for t in r["result"]]
-check("list_tools → 8 เครื่องมือ", len(names) == 8, str(names))
+check("list_tools → 9 เครื่องมือ (เพิ่ม get_viewport_screenshot)", len(names) == 9, str(names))
 for want in ("get_scene_hierarchy", "add_primitive_mesh", "modify_object_transform",
              "execute_blender_script"):
     check(f"มีเครื่องมือบังคับ: {want}", want in names)
@@ -331,13 +331,68 @@ r = br.handle_message({"id": 2, "method": "call_tool",
                        "params": {"name": "get_scene_hierarchy", "arguments": {}}})
 check("เรียกซ้ำหลัง error ยังทำงานปกติ", r["ok"] is True, str(r)[:120])
 check("จำนวนเครื่องมือคงที่ ไม่สะสมซ้ำ",
-      len(br.handle_message({"id": 3, "method": "list_tools"})["result"]) == 8)
+      len(br.handle_message({"id": 3, "method": "list_tools"})["result"]) == 9)
 
 r = br.handle_message({"id": 4, "method": "call_tool",
                        "params": {"name": "get_scene_hierarchy",
                                   "arguments": {"max_objects": "ไม่ใช่ตัวเลข"}}})
 check("ส่งชนิดข้อมูลผิด → จับได้ ไม่ล้มทั้ง bridge",
       r["ok"] is False or isinstance(r.get("result"), dict), str(r)[:160])
+
+# ===========================================================================
+section("[9] get_viewport_screenshot — ให้ AI 'เห็น' ฉากได้")
+# ===========================================================================
+import pathlib as _pl  # noqa: E402
+
+fake_bpy.reset()
+r = ok("get_viewport_screenshot")
+shot = _pl.Path(r["filepath"])
+check("คืนที่อยู่ไฟล์รูป", shot.suffix == ".png" and shot.is_file(), r["filepath"])
+check("เป็น PNG จริง (ตรวจหัวไฟล์)",
+      shot.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n", str(shot.read_bytes()[:8]))
+check("โหมด -b เลือก 'render' ให้เอง (ไม่ใช่ viewport ที่ต้องมีหน้าต่าง)",
+      r["mode"] == "render", r["mode"])
+check("บอกกล้องที่ใช้จริง", r["camera"] == "Camera", str(r["camera"]))
+check("บอกขนาดไฟล์/ความละเอียด/เวลา",
+      r["bytes"] > 0 and r["resolution"] == [1920, 1080] and "seconds" in r, str(r)[:150])
+check("เขียนไฟล์ลงโฟลเดอร์ชั่วคราว (ไม่ทับไฟล์ผู้ใช้)", "view-" in shot.name, shot.name)
+
+sc = fake_bpy.DATA.scenes[0].render
+check("⚠️ คืนค่าตั้งการเรนเดอร์เดิมหลังถ่ายภาพ (resolution)",
+      sc.resolution_x == 1920 and sc.resolution_y == 1080, f"{sc.resolution_x}x{sc.resolution_y}")
+check("⚠️ คืนค่า filepath เดิม (ไม่ทิ้งร่องรอย)", sc.filepath == "", repr(sc.filepath))
+check("คืนเปอร์เซ็นต์ความละเอียดเดิม", sc.resolution_percentage == 100)
+
+r = ok("get_viewport_screenshot", width=800, height=600)
+check("กำหนดความละเอียดเองได้", r["resolution"] == [800, 600], str(r["resolution"]))
+check("รายงานค่าที่ใช้จริง ไม่ใช่ค่าเดิมหลังคืนค่า",
+      r["resolution"] != [1920, 1080], "บั๊กที่เคยเกิด: อ่านค่าหลัง restore")
+
+r = ok("get_viewport_screenshot", filepath="/tmp/lpm-test-shot")
+check("Blender เติมนามสกุลให้เอง → ตามหาไฟล์เจอ", r["filepath"].endswith(".png"), r["filepath"])
+check("ไฟล์ที่ Blender เขียนจริงมีอยู่", _pl.Path(r["filepath"]).is_file())
+
+r = call("get_viewport_screenshot", mode="ไม่ถูกต้อง")
+check("mode ที่ไม่รู้จัก → ปฏิเสธแบบ argument error",
+      r["ok"] is False and r.get("error_type") == "arguments", str(r)[:150])
+
+r = call("get_viewport_screenshot", mode="viewport")
+check("สั่ง viewport ในโหมด -b → บอกให้ชัดว่าทำไม่ได้ พร้อมทางออก",
+      r["ok"] is False and "render" in r["error"] and "หน้าต่าง" in r["error"], str(r["error"])[:160])
+
+r = call("get_viewport_screenshot", camera="Light")
+check("ระบุวัตถุที่ไม่ใช่กล้อง → ปฏิเสธอย่างสุภาพ",
+      r["ok"] is False and "ไม่ใช่กล้อง" in r["error"], str(r)[:160])
+check("เรียกซ้ำได้ (ไม่ค้างสถานะ)", ok("get_viewport_screenshot")["bytes"] > 0)
+
+# ไม่มีกล้องในฉาก → ต้องบอกวิธีสร้างกล้อง
+fake_bpy.reset()
+fake_bpy.DATA.scenes[0].camera = None
+fake_bpy.DATA.objects.pop("Camera", None)
+r = call("get_viewport_screenshot")
+check("ฉากไม่มีกล้อง → บอกว่าต้องมีกล้องก่อน",
+      r["ok"] is False and "ไม่มีกล้อง" in r["error"], str(r["error"])[:160])
+check("ข้อความแนะนำวิธีสร้างกล้อง", "camera_add" in r["error"], str(r["error"])[:200])
 
 print()
 print("=" * 70)

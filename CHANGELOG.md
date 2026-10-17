@@ -41,7 +41,7 @@ _ยังไม่มี_
 - ตัวเลือก: `--blend-file`, `--blender`, `--timeout`, `--check`, `--list-tools`, `--selftest`
 - ค้นหา Blender ให้เองบน Windows/Linux/macOS และ**บอกที่มาของคำตอบ** (เจอจาก PATH / จากตัวแปร / จากที่มาตรฐาน)
 
-**เครื่องมือ 8 ตัว**
+**เครื่องมือ 9 ตัว**
 
 | เครื่องมือ | ทำอะไร |
 |---|---|
@@ -53,6 +53,7 @@ _ยังไม่มี_
 | `delete_object` | ลบวัตถุ (มีสลัก `confirm` กันลบพลาด) |
 | `set_object_material` | ใส่วัสดุ Principled BSDF |
 | `save_blend_file` | บันทึกไฟล์ `.blend` |
+| `get_viewport_screenshot` | **เรนเดอร์ภาพให้ AI เห็นฉาก — คืนเป็นรูปจริง (content block ชนิด image) + ข้อมูลกำกับ** ทำงานได้ทั้งโหมด `-b` (โหมด `render`) และ GUI (โหมด `viewport`) |
 
 **ทรัพยากร 2 ตัว** — `blender://file/metadata` (ที่อยู่ไฟล์ · render engine · เฟรม ·
 ความละเอียด · จำนวนของในไฟล์) และ `blender://scene/hierarchy`
@@ -64,6 +65,7 @@ _ยังไม่มี_
 - รับคำสั่งทางซ็อกเก็ต `127.0.0.1` พร้อม token สุ่มทุกครั้ง
 
 **add-on ของ Blender** — `blender_addon/__init__.py`
+- เปิดสะพานอัตโนมัติเมื่อโหลดไฟล์ (เปิด/ปิดได้ในแผง · ทำเฉพาะเมื่อมีหน้าต่าง Blender)
 - แผงใน `View3D > Sidebar (N) > Blender MCP` · เริ่ม/หยุดสะพาน · แสดงพอร์ต+token
 - ใช้ token แบบสุ่มและเก็บไว้ในไฟล์ `.blend` · แก้พอร์ตได้ (ค่าปริยาย `9876`)
 
@@ -72,11 +74,14 @@ _ยังไม่มี_
 - `run-blender-mcp.bat` / `.sh` — ตัวเปิดเซิร์ฟเวอร์และคำสั่งตรวจวินิจฉัย
 - `tools/build_addon_zip.py` — สร้าง zip สำหรับ `Install from Disk` ใน Blender
   (อ่านเลขเวอร์ชันจาก `bl_info` ตั้งชื่อไฟล์เอง และตรวจโครงสร้างก่อนคืนค่า)
+- **`--install-addon` / `--uninstall-addon`** — คัดลอก add-on ไปไว้ในโฟลเดอร์ของ Blender ให้เอง
+  ทุกเวอร์ชันที่พบ (มี `--dry-run` ให้ดูก่อน) · `--check` รายงานสถานะ add-on ด้วย
+- **ตรวจเวอร์ชันโปรโตคอล** ระหว่างเซิร์ฟเวอร์กับสะพาน เตือนพร้อมวิธีแก้ถ้า add-on เป็นเวอร์ชันเก่า
 - เอกสาร: `README.md` · `INSTALL.th.md` · `INSTALL.md` · `docs/01-ติดตั้ง-Windows11.md`
   · `docs/02-Hermes-config.md`
 
 **การทดสอบและ CI**
-- **343 ข้อ ใน 5 ชุด** ทดสอบด้วยของจริงทุกชั้นยกเว้นตัว Blender (ใช้ `tests/fake_bpy.py`)
+- **399 ข้อ ใน 5 ชุด** ทดสอบด้วยของจริงทุกชั้นยกเว้นตัว Blender (ใช้ `tests/fake_bpy.py`)
 - `test_mcp_e2e.py` ขับด้วย **MCP client ทางการ** ผ่าน stdio จริง ครบวงจร
 - GitHub Actions รันบน Python 3.10 + 3.12 พร้อมตรวจว่า **stdout ว่าง 0 ไบต์** ตอนสตาร์ต
 
@@ -113,7 +118,7 @@ _ยังไม่มี_
 - เชื่อมกับ **Hermes Agent ตัวจริง** ได้: `hermes mcp add` → `✓ Connected! Found 8 tool(s)`
   · `hermes mcp test` → `✓ Connected (1950ms) · ✓ Tools discovered: 8`
 - stdout ว่าง 0 ไบต์ตอนสตาร์ต (ท่อ JSON-RPC สะอาด)
-- ชุดทดสอบ 343 ข้อ ผ่านหมด
+- ชุดทดสอบ 399 ข้อ ผ่านหมด
 
 **ยังไม่ได้ยืนยัน**
 - การเปิด/ปิด **Blender จริง** และ `bpy.app.timers` ของจริง (เครื่องที่พัฒนาไม่มี Blender)

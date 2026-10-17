@@ -15,7 +15,14 @@ fake_bpy.py — ``bpy`` ปลอมสำหรับทดสอบตรร�
 
 from __future__ import annotations
 
+import base64
 import math
+import pathlib
+
+# PNG 1x1 ตัวจริง (ใช้แทนผลการเรนเดอร์) — เทสต์ตรวจหัวไฟล์ PNG ได้จริง
+PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+)
 
 
 # ------------------------------------------------------------------ คอลเลกชัน
@@ -244,10 +251,12 @@ class FakeScene:
         self.render = type("R", (), {
             "fps": 24, "engine": "BLENDER_EEVEE_NEXT",
             "resolution_x": 1920, "resolution_y": 1080, "resolution_percentage": 100,
+            "filepath": "",
             "image_settings": type("I", (), {"file_format": "PNG"})(),
         })()
         self.world = type("W", (), {"name": "World"})()
         self.collection = FakeSceneCollection("Scene Collection")
+        self.camera = None          # ของจริงตั้งกล้องให้ฉากเริ่มต้น — reset() จะตั้งให้
 
 
 # ------------------------------------------------------------------ ops
@@ -265,6 +274,7 @@ class FakeOps:
         self.calls: list[tuple[str, dict]] = []
         self._mesh = _FakeMeshOps(self)
         self._wm = _FakeWmOps(self)
+        self._render = _FakeRenderOps(self)
 
     # bpy.ops.mesh.*
     @property
@@ -275,6 +285,11 @@ class FakeOps:
     @property
     def wm(self):
         return self._wm
+
+    # bpy.ops.render.*
+    @property
+    def render(self):
+        return self._render
 
 
 _MESH_IDENTIFIERS = {
@@ -314,6 +329,48 @@ class _FakeMeshOps:
         op.get_rna_type = get_rna_type
         op.__name__ = op_name
         return op
+
+
+class _FakeRenderOps:
+    """bpy.ops.render.* — เขียนไฟล์ PNG จริง เพื่อให้ทดสอบเส้นทางได้ครบ
+
+    Blender จริงจะ **เติมนามสกุลให้เอง** ถ้า filepath ไม่มี (เช่น `view.png` → `view.png.png`
+    ถ้าตั้งชื่อมี .png อยู่แล้วจะไม่เติม) — ของปลอมก็ทำเหมือนกัน เพื่อให้เทสต์
+    ตรวจเส้นทาง "ตามหาไฟล์ที่ Blender เขียนจริง" ได้
+    """
+
+    def __init__(self, ops: FakeOps):
+        self._ops = ops
+        self.saved_to: list[str] = []
+
+    def _write(self, op_name: str, write_still: bool) -> dict:
+        scene = DATA.scenes[0]
+        render = scene.render
+        self._ops.calls.append((f"render.{op_name}", {"write_still": write_still}))
+        if not write_still:
+            return {"FINISHED"}
+        target = render.filepath
+        if not target:
+            raise RuntimeError("ไม่ตั้ง render.filepath — Blender จะไม่รู้จะเขียนที่ไหน")
+        path = pathlib.Path(target)
+        if path.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+            path = pathlib.Path(str(path) + ".png")     # เลียนแบบการเติมนามสกุลของ Blender
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(PNG_1X1)
+        self.saved_to.append(str(path))
+        return {"FINISHED"}
+
+    def render(self, write_still: bool = False, **kwargs):  # noqa: ARG002
+        if DATA.scenes[0].camera is None:
+            # ตรงกับของจริง: เรนเดอร์โดยไม่มีกล้อง = error
+            raise RuntimeError("Cannot render, no camera")
+        return self._write("render", write_still)
+
+    def opengl(self, write_still: bool = False, **kwargs):  # noqa: ARG002
+        if getattr(app, "background", True):
+            # ของจริง: opengl render ใช้ไม่ได้ในโหมด -b (ไม่มี OpenGL context)
+            raise RuntimeError("OpenGL render is not available in background mode")
+        return self._write("opengl", write_still)
 
 
 class _FakeWmOps:
@@ -429,6 +486,7 @@ def reset(background: bool = True):
         o.users_collection = [scene.collection]
     DATA.cameras.add(cam)
     DATA.lights.add(light)
+    scene.camera = cam              # เหมือนไฟล์เริ่มต้นของ Blender (มีกล้องตั้งไว้แล้ว)
     props = FakeSceneCollection("Props", parent=scene.collection)
     scene.collection.children.append(props)
     DATA.collections.add(props)

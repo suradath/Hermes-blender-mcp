@@ -41,10 +41,13 @@ import io
 import contextlib
 import json
 import os
+import pathlib
 import queue
 import socket
 import sys
+import tempfile
 import threading
+import time
 import traceback
 
 # bpy มีให้เฉพาะตอนรันใน Blender — โหมดทดสอบจะฉีด bpy ปลอมเข้า sys.modules ก่อน import
@@ -507,6 +510,115 @@ def save_blend_file(filepath: str = "") -> dict:
         target += ".blend"
     bpy.ops.wm.save_as_mainfile(filepath=target)
     return {"saved": True, "filepath": target}
+
+
+@tool(
+    "get_viewport_screenshot",
+    "Render a PNG of the current view so you can SEE the scene. Default mode "
+    "'render' uses the active camera and works everywhere, including blender -b "
+    "with no window; mode 'viewport' grabs the 3D viewport instead and needs a "
+    "Blender window. Returns the PNG path plus metadata. Use this to check your "
+    "own work: after adding or moving objects, look at the result.",
+)
+def get_viewport_screenshot(filepath: str = "", width: int = 0, height: int = 0,
+                            mode: str = "auto", camera: str = "") -> dict:
+    scene = _scene()
+    render = getattr(scene, "render", None)
+    if render is None:
+        raise ToolError("ฉากนี้ไม่มีค่าตั้งการเรนเดอร์ (scene.render)")
+
+    if mode not in ("auto", "render", "viewport"):
+        raise ToolArgumentError(f"mode '{mode}' ไม่ถูกต้อง — ใช้ auto | render | viewport")
+
+    has_window = not bool(getattr(bpy.app, "background", True))
+    use = ("viewport" if has_window else "render") if mode == "auto" else mode
+    if use == "viewport" and not has_window:
+        raise ToolError(
+            "โหมด -b (ไม่มีหน้าต่าง) ถ่ายภาพ viewport ไม่ได้ — ใช้ mode='render' "
+            "(เรนเดอร์จากกล้อง ใช้ได้ทุกโหมด) หรือเปิด Blender แบบมีหน้าต่าง")
+
+    # ต้องมีกล้อง (สำหรับโหมด render)
+    cam_obj = None
+    if camera:
+        cam_obj = _find_object(camera)
+        if cam_obj.type != "CAMERA":
+            raise ToolError(f"วัตถุ '{cam_obj.name}' ไม่ใช่กล้อง (เป็น {cam_obj.type})")
+    else:
+        cam_obj = getattr(scene, "camera", None)
+        if cam_obj is None:
+            cams = [o for o in bpy.data.objects if o.type == "CAMERA"]
+            if not cams:
+                raise ToolError(
+                    "ฉากนี้ไม่มีกล้อง — โหมด render ต้องมีกล้องก่อน "
+                    "(สร้างได้ด้วย execute_blender_script: bpy.ops.object.camera_add())")
+            cam_obj = cams[0]
+    if use == "render" and getattr(scene, "camera", None) is None:
+        scene.camera = cam_obj          # ตั้งกล้องให้ชั่วคราวเพื่อเรนเดอร์
+
+    # จำค่าตั้งเดิมไว้ แล้วคืนกลับเสมอ (ห้ามทิ้งค่าของผู้ใช้เปลี่ยนไป)
+    saved = {
+        "filepath": render.filepath,
+        "format": getattr(render.image_settings, "file_format", None),
+        "res_x": render.resolution_x, "res_y": render.resolution_y,
+        "res_pct": render.resolution_percentage,
+    }
+    target = filepath or str(pathlib.Path(tempfile.gettempdir()) / "blender-mcp" /
+                             f"view-{int(time.time() * 1000)}.png")
+    pathlib.Path(target).parent.mkdir(parents=True, exist_ok=True)
+
+    started = time.time()
+    effective = [int(render.resolution_x), int(render.resolution_y)]
+    try:
+        render.filepath = target
+        if getattr(render.image_settings, "file_format", None) is not None:
+            render.image_settings.file_format = "PNG"
+        if width:
+            render.resolution_x = int(width)
+        if height:
+            render.resolution_y = int(height)
+        if width or height:
+            render.resolution_percentage = 100
+        # ⚠️ ต้องจำค่าที่ใช้จริง "ก่อน" คืนค่าเดิมตอน finally — ไม่งั้นจะรายงานค่าเก่า
+        effective = [int(render.resolution_x), int(render.resolution_y)]
+        try:
+            if use == "viewport":
+                bpy.ops.render.opengl(write_still=True)
+            else:
+                bpy.ops.render.render(write_still=True)
+        except Exception as exc:  # noqa: BLE001 - ต้องไม่ทำให้ Blender ตาย
+            raise ToolError(
+                f"เรนเดอร์ไม่สำเร็จ ({type(exc).__name__}: {exc})"
+                + (" — โหมด viewport ต้องมีหน้าต่าง Blender และ 3D View ที่ใช้งานอยู่"
+                   if use == "viewport" else
+                   " — ตรวจว่ามีกล้องในฉากและ engine ที่เลือกใช้ได้")) from exc
+    finally:
+        render.filepath = saved["filepath"]
+        if saved["format"] is not None:
+            render.image_settings.file_format = saved["format"]
+        render.resolution_x = saved["res_x"]
+        render.resolution_y = saved["res_y"]
+        render.resolution_percentage = saved["res_pct"]
+
+    # เผื่อ Blender เขียนนามสกุลต่อท้ายเอง (เช่น .png ซ้ำ)
+    written = pathlib.Path(target)
+    if not written.is_file():
+        for cand in (pathlib.Path(target + ".png"), pathlib.Path(target).with_suffix(".png")):
+            if cand.is_file():
+                written = cand
+                break
+    if not written.is_file():
+        raise ToolError(f"เรนเดอร์เสร็จแต่ไม่พบไฟล์ผลลัพธ์ที่ {target}")
+
+    return {
+        "filepath": str(written),
+        "bytes": written.stat().st_size,
+        "mode": use,
+        "engine": getattr(render, "engine", None),
+        "resolution": effective,
+        "camera": cam_obj.name,
+        "seconds": round(time.time() - started, 2),
+        "note": "ไฟล์นี้อยู่ในโฟลเดอร์ชั่วคราว — ระบุ filepath ถ้าต้องการเก็บไว้",
+    }
 
 
 # ===========================================================================
