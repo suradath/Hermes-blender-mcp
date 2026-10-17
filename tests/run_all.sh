@@ -26,6 +26,7 @@ declare -a NAMES=(
     "test_docs_links.py"
     "test_example_character.py"
     "test_mesh_lib.py"
+    "test_thai_house.py"
     "test_server_utils.py"
     "test_bridge_logic.py"
     "test_mcp_e2e.py"

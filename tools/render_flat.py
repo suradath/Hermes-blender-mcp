@@ -16,6 +16,14 @@ from __future__ import annotations
 import math
 
 
+def _rot_x(p, deg):
+    """เอียงกล้อง (ก้มลงมอง) — หมุนรอบแกน X"""
+    if not deg:
+        return p
+    a = math.radians(deg)
+    return (p[0], p[1] * math.cos(a) + p[2] * math.sin(a), -p[1] * math.sin(a) + p[2] * math.cos(a))
+
+
 def _rot_z(p, deg):
     if not deg:
         return p
@@ -23,9 +31,10 @@ def _rot_z(p, deg):
     return (p[0] * math.cos(a) - p[1] * math.sin(a), p[0] * math.sin(a) + p[1] * math.cos(a), p[2])
 
 
-def render(parts, out_path, width=560, height=780, view="front", rot_z=0.0,
+def render(parts, out_path, width=560, height=780, view="front", rot_z=0.0, rot_x=0.0,
            light=(-0.42, -0.72, 0.55), ambient=0.34, background=(250, 250, 252),
-           outline=(40, 40, 48), pad_frac=0.05, draw_outline=True):
+           outline=(40, 40, 48), pad_frac=0.05, draw_outline=True,
+           shadow=False, gradient=False):
     """เรนเดอร์มุมมองด้านหน้า (มองจาก -Y) · ``rot_z`` > 0 = หมุนตัวเป็นมุม 3/4
 
     parts = [(ชื่อ, (verts, faces), วัสดุ), ...] โดยวัสดุ = {"name":…, "color":(r,g,b)}
@@ -34,12 +43,17 @@ def render(parts, out_path, width=560, height=780, view="front", rot_z=0.0,
     from PIL import Image, ImageDraw
 
     # รวมทุกจุดเพื่อหากรอบและสเกล (หลังหมุน)
+    def xform(v):
+        return _rot_z(_rot_x(v, rot_x), rot_z) if (rot_x or rot_z) else v
+
     all_v = []
     for _n, (verts, _f), _m in parts:
-        all_v.extend(_rot_z(v, rot_z) for v in verts)
+        all_v.extend(xform(v) for v in verts)
     xs = [v[0] for v in all_v]
+    ys = [v[1] for v in all_v]
     zs = [v[2] for v in all_v]
     lo_x, hi_x = min(xs), max(xs)
+    lo_y, hi_y = min(ys), max(ys)
     lo_z, hi_z = min(zs), max(zs)
     span_x, span_z = (hi_x - lo_x) or 1.0, (hi_z - lo_z) or 1.0
     scale = min(width * (1 - 2 * pad_frac) / span_x, height * (1 - 2 * pad_frac) / span_z)
@@ -64,9 +78,9 @@ def render(parts, out_path, width=560, height=780, view="front", rot_z=0.0,
             nrm = (u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0])
             ln = math.sqrt(sum(c * c for c in nrm)) or 1.0
             nrm = tuple(c / ln for c in nrm)
-            rot_pts = [_rot_z(q, rot_z) for q in pts]         # หมุนครั้งเดียว ใช้ทั้งหน้า
-            if rot_z:
-                nrm = _rot_z(nrm, rot_z)
+            rot_pts = [xform(q) for q in pts]                 # แปลงครั้งเดียว ใช้ทั้งหน้า
+            if rot_x or rot_z:
+                nrm = xform(nrm)
             if nrm[1] >= 0:                                  # หันหลังให้กล้อง (มองจาก -Y)
                 continue
             depth = sum(q[1] for q in rot_pts) / len(rot_pts)
@@ -77,8 +91,34 @@ def render(parts, out_path, width=560, height=780, view="front", rot_z=0.0,
             tris.append((depth, [to_screen(q) for q in rot_pts], fill))
 
     tris.sort(key=lambda t: -t[0])                            # ไกลก่อน ใกล้ทับทีหลัง
-    img = Image.new("RGB", (width, height), background)
+    if gradient:                                              # พื้นหลังไล่สีอ่อน ๆ
+        from PIL import Image as _I
+        img = _I.new("RGB", (width, height))
+        _d = ImageDraw.Draw(img)
+        for yy in range(height):
+            k = yy / max(1, height - 1)
+            col = tuple(int(background[i] + (232 + 6 * i - background[i]) * k * 0.85)
+                        for i in range(3))
+            _d.line([(0, yy), (width, yy)], fill=col)
+    else:
+        img = Image.new("RGB", (width, height), background)
     d = ImageDraw.Draw(img)
+    if shadow:                                                # เงาสัมผัสใต้โมเดล (นุ่ม ๆ)
+        from PIL import ImageFilter
+        corners = [to_screen(xform((x, y, lo_z)))
+                   for x in (lo_x, hi_x) for y in (lo_y, hi_y)]
+        px_ = [c[0] for c in corners]
+        py_ = [c[1] for c in corners]
+        cx_ = (min(px_) + max(px_)) / 2.0
+        cy_ = (min(py_) + max(py_)) / 2.0
+        rx_ = max(6.0, (max(px_) - min(px_)) / 2.0 * 1.02)
+        ry_ = max(4.0, rx_ * 0.26)
+        layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        ImageDraw.Draw(layer).ellipse([cx_ - rx_, cy_ - ry_, cx_ + rx_, cy_ + ry_],
+                                      fill=(28, 30, 36, 110))
+        img = Image.alpha_composite(img.convert("RGBA"),
+                                    layer.filter(ImageFilter.GaussianBlur(10))).convert("RGB")
+        d = ImageDraw.Draw(img)
     for _depth, poly, fill in tris:
         d.polygon(poly, fill=fill, outline=outline if draw_outline else None)
     img.save(out_path)

@@ -396,6 +396,36 @@ def chamfered_frustum(bottom, top, height, chamfer, center=(0.0, 0.0, 0.0)):
     return [(v[0] + center[0], v[1] + center[1], v[2] + center[2]) for v in verts], faces
 
 
+def isosceles_prism(base, height, length, center=(0.0, 0.0, 0.0), chamfer=0.0, ridge_z=0.0):
+    """ปริซึมหน้าตัด "สามเหลี่ยมหน้าจั่ว" — ใช้ทำหลังคาจั่ว/หน้าบัน
+
+    ``base`` = ความกว้างฐาน (แกน Y) · ``height`` = สูงถึงสัน · ``length`` = ยาวตามแกน X
+    จุดกึ่งกลางที่รับมาคือ "กลางกรอบ" (bbox center) — ฐานล่างจะอยู่ที่ z = center.z − height/2
+    """
+    hb = base / 2.0
+    ln = math.sqrt(height ** 2 + hb ** 2) or 1.0
+    ny, nz = height / ln, hb / ln          # หน่วยตั้งฉากของด้านลาด (ชี้ขึ้น-ออก)
+    off = height * hb / ln                 # ค่าคงที่ของระนาบด้านลาด (เท่ากันทั้งสองข้าง)
+    planes = [((0.0, 0.0, -1.0), 0.0),
+              ((0.0, ny, nz), off),
+              ((0.0, -ny, nz), off),
+              ((1.0, 0.0, 0.0), length / 2.0),
+              ((-1.0, 0.0, 0.0), length / 2.0)]
+    if chamfer > EPS:
+        planes = chamfer_all(planes, chamfer)
+    verts, faces = convex_from_planes(planes)
+    verts = [(v[0], v[1], v[2] - height / 2.0) for v in verts]      # จัดให้กลางกรอบอยู่ที่ 0
+    return [(v[0] + center[0], v[1] + center[1], v[2] + center[2] + ridge_z) for v in verts], faces
+
+
+def slanted_slab(length, width, thickness, angle_deg, center=(0.0, 0.0, 0.0), chamfer=0.0):
+    """แผ่นเอียง (ชายคา/ป้านลม/บันได) — หนา ``thickness`` ยาว ``length`` (แกน X)
+    กว้าง ``width`` เอียงรอบแกน X ตามองศาที่ให้"""
+    part = chamfered_box(length / 2.0, width / 2.0, thickness / 2.0, chamfer)
+    part = rotate(part, rx=angle_deg)
+    return translate(part, *center)
+
+
 # ───────────────────────────── ส่งออก ─────────────────────────────
 
 def write_obj(path, groups, mtl_path=None):
