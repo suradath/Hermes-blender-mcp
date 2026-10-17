@@ -301,6 +301,8 @@ check("ไม่ใส่ --deep → ตรวจแค่พื้นฐาน"
 
 section("[9] บทเรียนจากโหมด GUI (จาก log จริงของผู้ใช้)")
 _src = (ROOT / "blender_mcp_server.py").read_text(encoding="utf-8")
+check("ลบ --token พร้อมค่าที่ตามมาด้วย (กันโทเคนซ้ำเป็นอาร์กิวเมนต์ลอย)",
+      "_skip = True" in _src and "_clean.append(_c)" in _src)
 check("ส่งโทเคนเป็น --token=<ค่า> (กันโทเคนที่เริ่มด้วย -)",
       'f"--token={self.token}"' in _src,
       "ต้องใช้ --token=<ค่า> ไม่ใช่ ['--token', token]")

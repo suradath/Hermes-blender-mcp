@@ -414,8 +414,20 @@ class BlenderProcess:
         # ⚠️ ต้องเป็น --token=<ค่า> ไม่ใช่ ["--token", token] เพราะถ้าโทเคนบังเอิญ
         #    เริ่มด้วย - (เช่น "-95vRW...") argparse จะตีความเป็น option แล้วขึ้น
         #    "argument --token: expected one argument" (เจอจริงจาก log ของผู้ใช้)
-        cmd = [c for c in cmd if not c.startswith("--token")]
-        cmd += [f"--token={self.token}",
+        # ลบ "--token" พร้อม "ค่าที่ตามมา" ออกให้ครบ (เดิมลบแค่ชื่อออปชัน
+        # → ค่าโทเคนกลายเป็นอาร์กิวเมนต์ลอย ๆ แล้วเราก็ใส่ --token= อีกที = ซ้ำ)
+        _clean, _skip = [], False
+        for _c in cmd:
+            if _skip:
+                _skip = False
+                continue
+            if _c == "--token":
+                _skip = True
+                continue
+            if _c.startswith("--token="):
+                continue
+            _clean.append(_c)
+        cmd = _clean + [f"--token={self.token}",
                 "--mode", "main" if not self.args.gui else "timer",
                 "--interval", str(self.args.interval)]
 
