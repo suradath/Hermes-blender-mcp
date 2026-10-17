@@ -79,7 +79,7 @@ class Log:
             self.path = None
 
     def __call__(self, *parts: object) -> None:
-        line = "[blender-mcp] " + " ".join(str(p) for p in parts)
+        line = "[Hermes-blender-mcp] " + " ".join(str(p) for p in parts)
         with self._lock:
             print(line, file=sys.stderr, flush=True)
             if self.path is not None:
@@ -165,7 +165,7 @@ def install_addon(explicit_blender: str = "", dry_run: bool = False,
         for name, src in sources.items():
             shutil.copy2(src, target / name)
     return {"addon": ADDON_DIRNAME, "versions": versions, "results": results,
-            "next": "เปิด Blender > Edit > Preferences > Add-ons > ติ๊ก 'LPM Blender MCP Bridge'"
+            "next": "เปิด Blender > Edit > Preferences > Add-ons > ติ๊ก 'Hermes Blender MCP Bridge'"
                     " (หรือเปิดใช้ auto-start ในแผง)"}
 
 
@@ -831,7 +831,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     args, unknown = p.parse_known_args(argv)
     args.unknown_args = list(unknown)
     if not args.log_file:
-        args.log_file = str(pathlib.Path(tempfile.gettempdir()) / "blender-mcp" /
+        args.log_file = str(pathlib.Path(tempfile.gettempdir()) / "Hermes-blender-mcp" /
                             f"server-{os.getpid()}.log")
     if not args.working_dir:
         args.working_dir = None

@@ -1,4 +1,4 @@
-# LPM Blender MCP — ให้ Hermes สั่งงาน Blender 5.2 ได้
+# Hermes Blender MCP — ให้ Hermes สั่งงาน Blender 5.2 ได้
 
 MCP Server (stdio) ที่เชื่อม **Hermes Agent** เข้ากับ **Blender 5.2 LTS** ผ่าน `bpy`
 ให้ AI อ่านฉาก สร้าง/ขยับวัตถุ ใส่สี และรันสคริปต์ได้จริงจากในแชท
@@ -83,9 +83,9 @@ MCP สื่อสารผ่าน stdio แต่ `blender -b` พ่นข�
 ### 🪟 Windows 11 (แนะนำ)
 
 ```bat
-:: 1) วางโฟลเดอร์โปรเจกต์ไว้ที่ไหนก็ได้ เช่น C:\blender-mcp
+:: 1) วางโฟลเดอร์โปรเจกต์ไว้ที่ไหนก็ได้ เช่น C:\Hermes-blender-mcp
 ::    แล้วดับเบิลคลิก (หรือรันใน cmd):
-C:\blender-mcp\install-windows.bat
+C:\Hermes-blender-mcp\install-windows.bat
 ```
 
 สคริปต์จะทำให้ทั้งหมด: หา Python → สร้าง `.venv` → ติดตั้ง `mcp` → **ตรวจว่าเจอ Blender ไหม**
@@ -94,14 +94,14 @@ C:\blender-mcp\install-windows.bat
 ถ้าขั้นสุดท้ายบอกว่า **"หา Blender ไม่เจอ"** ให้ระบุเอง:
 
 ```bat
-C:\blender-mcp\.venv\Scripts\python.exe C:\blender-mcp\blender_mcp_server.py ^
+C:\Hermes-blender-mcp\.venv\Scripts\python.exe C:\Hermes-blender-mcp\blender_mcp_server.py ^
   --check --blender "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
 ```
 
 ### 🐧 Linux / 🍎 macOS
 
 ```bash
-cd /path/to/blender-mcp
+cd /path/to/Hermes-blender-mcp
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 ./.venv/bin/python blender_mcp_server.py --check
@@ -111,14 +111,14 @@ python3 -m venv .venv
 
 ```
 Blender: /usr/bin/blender (เจอใน PATH)
-สคริปต์สะพาน: /path/to/blender-mcp/blender_bridge.py ✅
+สคริปต์สะพาน: /path/to/Hermes-blender-mcp/blender_bridge.py ✅
 ```
 
 ### ✅ ทดสอบครั้งแรก (แนะนำอย่างยิ่ง)
 
 ```bat
-run-blender-mcp.bat --selftest      :: Windows
-./run-blender-mcp.sh --selftest     :: Linux/macOS
+run-hermes-blender-mcp.bat --selftest      :: Windows
+./run-hermes-blender-mcp.sh --selftest     :: Linux/macOS
 ```
 
 คำสั่งนี้จะเปิด Blender จริง แล้วไล่เรียกทุกเครื่องมือให้ดูผลทีละตัว
@@ -149,17 +149,17 @@ Hermes มีตัวจัดการ MCP ในตัว ใช้ `hermes m
 ```powershell
 # Windows 11 (PowerShell) — ⚠️ --args ต้องอยู่ "ท้ายสุด" เสมอ
 hermes mcp add blender `
-  --command "C:\blender-mcp\.venv\Scripts\python.exe" `
+  --command "C:\Hermes-blender-mcp\.venv\Scripts\python.exe" `
   --connect-timeout 120 `
-  --args C:\blender-mcp\blender_mcp_server.py
+  --args C:\Hermes-blender-mcp\blender_mcp_server.py
 ```
 
 ```bash
 # Linux / macOS
 hermes mcp add blender \
-  --command "/path/to/blender-mcp/.venv/bin/python" \
+  --command "/path/to/Hermes-blender-mcp/.venv/bin/python" \
   --connect-timeout 120 \
-  --args /path/to/blender-mcp/blender_mcp_server.py
+  --args /path/to/Hermes-blender-mcp/blender_mcp_server.py
 ```
 
 ผลลัพธ์ที่ได้จริง (คัดจากเครื่องที่ทดสอบ):
@@ -202,7 +202,7 @@ hermes mcp remove blender
 
 ```powershell
 hermes mcp add blender --command "..." --connect-timeout 120 `
-  --args C:\blender-mcp\blender_mcp_server.py --blend-file "C:\งาน\บ้าน.blend"
+  --args C:\Hermes-blender-mcp\blender_mcp_server.py --blend-file "C:\งาน\บ้าน.blend"
 ```
 
 ### วิธีที่ 2 — แก้ `~/.hermes/config.yaml` เอง
@@ -212,9 +212,9 @@ hermes mcp add blender --command "..." --connect-timeout 120 `
 ```yaml
 mcp_servers:
   blender:
-    command: C:\blender-mcp\.venv\Scripts\python.exe
+    command: C:\Hermes-blender-mcp\.venv\Scripts\python.exe
     args:
-      - C:\blender-mcp\blender_mcp_server.py
+      - C:\Hermes-blender-mcp\blender_mcp_server.py
     connect_timeout: 120.0
     enabled: true
     timeout: 300            # เพิ่มเอง — งาน 3D ใช้เวลาได้ (ค่าปริยาย 120)
@@ -346,7 +346,7 @@ hermes mcp add blender --command "..." --connect-timeout 60 \
 | `หา Blender ไม่เจอ` | ใช้ `--blender "พาธเต็ม"` หรือตั้ง `BLENDER_EXE` (Hermes กรอง env ออก — ส่งผ่าน `env:` ใน config ด้วยก็ได้) |
 | `Blender ไม่พร้อมภายใน 90 วินาที` | เปิดเองเพื่อดูข้อผิดพลาดจริง: `blender -b --python blender_bridge.py -- --port 0 --selftest` แล้วดูบันทึกท้าย ๆ ที่เซิร์ฟเวอร์แนบมาให้ |
 | Hermes ขึ้น "Failed to connect to MCP server 'blender'" | `connect_timeout` สั้นเกินไป — ตั้งเป็น 120 (Blender ใช้เวลาหลายวินาที) |
-| เครื่องมือขึ้นแต่เรียกแล้วเงียบ | ดูบันทึกที่ `/tmp/blender-mcp/server-*.log` (Windows: `%TEMP%\blender-mcp\`) |
+| เครื่องมือขึ้นแต่เรียกแล้วเงียบ | ดูบันทึกที่ `/tmp/Hermes-blender-mcp/server-*.log` (Windows: `%TEMP%\Hermes-blender-mcp\`) |
 | `ต่อสะพานไม่สำเร็จ` | โหมด attach: ตรวจว่าใน Blender กด "เริ่มสะพาน" แล้ว และ token ตรงกัน |
 | คำสั่งถูกปฏิเสธด้วยข้อความ "ฝ่าด่านความปลอดภัย" | เป็นไปตามการออกแบบ — ถ้าตั้งใจจริงส่ง `allow_unsafe=true` |
 | งานค้างนาน (เช่น ลูปยาว/เรนเดอร์) | หมดเวลาตาม `timeout` — **Blender ไม่ถูกสั่งหยุดกลางคัน** (bpy หยุดกลางคันไม่ได้) จะทำงานต่อจนจบ |
@@ -413,7 +413,7 @@ bash tests/run_all.sh
 ## 10. แผนผังไฟล์
 
 ```
-blender-mcp/
+Hermes-blender-mcp/
 ├── README.md                 ← ภาพรวมสถาปัตยกรรม + เครื่องมือ + บทเรียน
 ├── INSTALL.md                ← คู่มือติดตั้ง (อังกฤษ)
 ├── INSTALL.th.md             ← คู่มือติดตั้ง (ไทย)
@@ -425,7 +425,7 @@ blender-mcp/
 ├── blender_addon/__init__.py ← add-on สำหรับโหมดมีหน้าต่าง (timer mode)
 ├── requirements.txt
 ├── install-windows.bat       ← ติดตั้งอัตโนมัติ (Windows 11)
-├── run-blender-mcp.bat/.sh   ← ตัวเปิดเซิร์ฟเวอร์ / --check / --selftest
+├── run-hermes-blender-mcp.bat/.sh   ← ตัวเปิดเซิร์ฟเวอร์ / --check / --selftest
 ├── tools/
 │   ├── build_addon_zip.py    ← สร้าง zip สำหรับติดตั้ง add-on (Install from Disk)
 │   ├── preview_blockout.py   ← วาดผัง blockout เทียบรูปต้นแบบ (ต้องมี Pillow · dev-only)
@@ -486,7 +486,7 @@ python blender_mcp_server.py --list-tools  # ดูรายการเคร�
 |---|---|
 | ดาว / fork | **31,125★ · 2,843 forks** |
 | สัญญาอนุญาต | MIT · เวอร์ชัน 2.1.9 · หน้าเว็บ [mcp-for-blender.com](https://www.mcp-for-blender.com/) |
-| ชื่อเดิม | `ahujasid/blender-mcp` (เปลี่ยนชื่อแล้ว — ลิงก์เก่าจะ redirect) |
+| ชื่อเดิม | `ahujasid/Hermes-blender-mcp` (เปลี่ยนชื่อแล้ว — ลิงก์เก่าจะ redirect) |
 | ติดตั้ง | `uvx mcp-for-blender` + ติดตั้ง add-on ใน Blender |
 | MCP SDK | **ตรึง `mcp>=1.26.0,<2`** และใช้ `from mcp.server.fastmcp import FastMCP` |
 
@@ -515,9 +515,9 @@ GitHub มี **508 รีโป** ที่เกี่ยวกับ "blender
 | รีโป | ดาว | สัญญาอนุญาต | จุดที่อ้าง |
 |---|---:|---|---|
 | `RFingAdam/mcp-blender` | 24★ | AGPL-3.0 | 218 เครื่องมือ + MSFS |
-| `carlosh7/blender-mcp` | — | — | "ครบที่สุด 223 เครื่องมือ" |
-| `6xvl/blender-mcp` | — | — | ~270 เครื่องมือ |
-| `jenkinsm13/better-blender-mcp` | — | — | ระบุ "Blender 5" + agents/skills |
+| `carlosh7/Hermes-blender-mcp` | — | — | "ครบที่สุด 223 เครื่องมือ" |
+| `6xvl/Hermes-blender-mcp` | — | — | ~270 เครื่องมือ |
+| `jenkinsm13/better-Hermes-blender-mcp` | — | — | ระบุ "Blender 5" + agents/skills |
 
 > 🚩 **สัญญาณเตือน:** รีโปที่อ้าง "N เครื่องมือ" แต่ดาว 0–2 หลัก มักเป็น fork ที่เปลี่ยนชื่อ
 > หรือสร้างด้วย AI — ให้ดูว่ามีเทสต์ไหม มี commit ต่อเนื่องไหม และอ่านโค้ดจริงก่อนติดตั้ง

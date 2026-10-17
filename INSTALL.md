@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide installs **LPM Blender MCP** — an MCP server that lets an AI agent
+This guide installs **Hermes Blender MCP** — an MCP server that lets an AI agent
 (Hermes Agent, Claude Desktop, or any MCP client) read and drive **Blender 5.2**
 through `bpy`.
 
@@ -45,8 +45,8 @@ There are **two installable pieces**. You only need the first one:
 ## 2. Get the code
 
 ```bash
-git clone https://github.com/<you>/blender-mcp.git
-cd blender-mcp
+git clone https://github.com/<you>/Hermes-blender-mcp.git
+cd Hermes-blender-mcp
 ```
 
 No git? Download the ZIP from the repository page and extract it.
@@ -60,14 +60,14 @@ No git? Download the ZIP from the repository page and extract it.
 The easy way — the installer does everything and reports whether Blender was found:
 
 ```powershell
-cd C:\path\to\blender-mcp
+cd C:\path\to\Hermes-blender-mcp
 .\install-windows.bat
 ```
 
 Or manually:
 
 ```powershell
-cd C:\path\to\blender-mcp
+cd C:\path\to\Hermes-blender-mcp
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -77,7 +77,7 @@ py -3 -m venv .venv
 ### 🐧 Linux / 🍎 macOS
 
 ```bash
-cd /path/to/blender-mcp
+cd /path/to/Hermes-blender-mcp
 python3 -m venv .venv
 ./.venv/bin/pip install --upgrade pip
 ./.venv/bin/pip install -r requirements.txt
@@ -88,7 +88,7 @@ Expected output of `--check`:
 
 ```
 Blender: /usr/bin/blender (เจอใน PATH)
-สคริปต์สะพาน: /path/to/blender-mcp/blender_bridge.py ✅
+สคริปต์สะพาน: /path/to/Hermes-blender-mcp/blender_bridge.py ✅
 ```
 
 If it says **"หา Blender ไม่เจอ"** (Blender not found), point at it explicitly:
@@ -115,10 +115,10 @@ calls **every tool once** (in a throwaway default scene, it does not touch your
 
 ```bash
 # Windows
-run-blender-mcp.bat --selftest
+run-hermes-blender-mcp.bat --selftest
 
 # Linux / macOS
-./run-blender-mcp.sh --selftest
+./run-hermes-blender-mcp.sh --selftest
 ```
 
 Expected:
@@ -157,18 +157,18 @@ config for you:
 
 ```bash
 hermes mcp add blender \
-  --command "/path/to/blender-mcp/.venv/bin/python" \
+  --command "/path/to/Hermes-blender-mcp/.venv/bin/python" \
   --connect-timeout 120 \
-  --args /path/to/blender-mcp/blender_mcp_server.py
+  --args /path/to/Hermes-blender-mcp/blender_mcp_server.py
 ```
 
 Windows PowerShell:
 
 ```powershell
 hermes mcp add blender `
-  --command "C:\path\to\blender-mcp\.venv\Scripts\python.exe" `
+  --command "C:\path\to\Hermes-blender-mcp\.venv\Scripts\python.exe" `
   --connect-timeout 120 `
-  --args C:\path\to\blender-mcp\blender_mcp_server.py
+  --args C:\path\to\Hermes-blender-mcp\blender_mcp_server.py
 ```
 
 > ⚠️ **`--args` must be the LAST option.** Anything after it is passed to the
@@ -209,9 +209,9 @@ Add to `~/.hermes/config.yaml`:
 ```yaml
 mcp_servers:
   blender:
-    command: /path/to/blender-mcp/.venv/bin/python
+    command: /path/to/Hermes-blender-mcp/.venv/bin/python
     args:
-      - /path/to/blender-mcp/blender_mcp_server.py
+      - /path/to/Hermes-blender-mcp/blender_mcp_server.py
     connect_timeout: 120.0
     enabled: true
     timeout: 300            # 3D work can be slow; the default is 120
@@ -223,8 +223,8 @@ mcp_servers:
 {
   "mcpServers": {
     "blender": {
-      "command": "/path/to/blender-mcp/.venv/bin/python",
-      "args": ["/path/to/blender-mcp/blender_mcp_server.py"]
+      "command": "/path/to/Hermes-blender-mcp/.venv/bin/python",
+      "args": ["/path/to/Hermes-blender-mcp/blender_mcp_server.py"]
     }
   }
 }
@@ -233,7 +233,7 @@ mcp_servers:
 Windows — use double backslashes in JSON:
 
 ```json
-"command": "C:\\path\\to\\blender-mcp\\.venv\\Scripts\\python.exe"
+"command": "C:\\path\\to\\Hermes-blender-mcp\\.venv\\Scripts\\python.exe"
 ```
 
 ### Useful server options
@@ -281,7 +281,7 @@ Output: `dist/blender_mcp_bridge-<version>.zip` — handy for GitHub Releases.
 1. Open Blender → `Edit > Preferences > Add-ons`
 2. Click the **▼** arrow (top-right) → **Install from Disk…**
 3. Choose `dist/blender_mcp_bridge-1.0.0.zip`
-4. Tick the checkbox next to **"LPM Blender MCP Bridge"**
+4. Tick the checkbox next to **"Hermes Blender MCP Bridge"**
 
 ### 6d. Start the bridge
 
@@ -372,8 +372,8 @@ add-on: Blender → `Edit > Preferences > Add-ons` → untick → **Remove**, an
 the `blender_mcp_bridge` folder from the add-ons directory.
 
 Nothing is written outside the project folder, except the add-on folder itself
-and a log file under your temp directory (`%TEMP%\blender-mcp\` /
-`/tmp/blender-mcp/`).
+and a log file under your temp directory (`%TEMP%\Hermes-blender-mcp\` /
+`/tmp/Hermes-blender-mcp/`).
 
 ---
 
@@ -388,7 +388,7 @@ and a log file under your temp directory (`%TEMP%\blender-mcp\` /
 | A tool call times out | Increase `timeout` in the config / `--timeout`. **Blender cannot be interrupted mid-call** — a long loop or render keeps running until it finishes |
 | Add-on appears but says it cannot find `blender_bridge.py` | The two files are not in the same folder — re-read [6c](#6c-enable-it-in-blender) or set `BLENDER_MCP_DIR` |
 | "refused because it breaks the safety guard" | Intended behaviour; pass `allow_unsafe=true` if you really mean it |
-| Logs | `%TEMP%\blender-mcp\server-*.log` (Windows) or `/tmp/blender-mcp/server-*.log` |
+| Logs | `%TEMP%\Hermes-blender-mcp\server-*.log` (Windows) or `/tmp/Hermes-blender-mcp/server-*.log` |
 
 Still stuck? Open an issue with the log tail and the output of
 `python blender_mcp_server.py --check`.

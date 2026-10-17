@@ -1,6 +1,6 @@
 # คู่มือติดตั้ง (ฉบับภาษาไทย)
 
-คู่มือนี้ติดตั้ง **LPM Blender MCP** — MCP server ที่ให้ AI (Hermes Agent,
+คู่มือนี้ติดตั้ง **Hermes Blender MCP** — MCP server ที่ให้ AI (Hermes Agent,
 Claude Desktop หรือไคลเอนต์ MCP ใด ๆ) อ่านและสั่งงาน **Blender 5.2** ผ่าน `bpy`
 
 > 🇬🇧 English version: **[INSTALL.md](INSTALL.md)**
@@ -44,8 +44,8 @@ Claude Desktop หรือไคลเอนต์ MCP ใด ๆ) อ่าน
 ## 2. ดาวน์โหลดโค้ด
 
 ```bash
-git clone https://github.com/<ชื่อคุณ>/blender-mcp.git
-cd blender-mcp
+git clone https://github.com/<ชื่อคุณ>/Hermes-blender-mcp.git
+cd Hermes-blender-mcp
 ```
 
 ไม่มี git? ดาวน์โหลด ZIP จากหน้ารีโปแล้วแตกไฟล์ก็ได้
@@ -59,14 +59,14 @@ cd blender-mcp
 วิธีง่าย — ดับเบิลคลิกหรือรันไฟล์เดียวจบ (สร้าง venv + ติดตั้ง + ตรวจเจอ Blender):
 
 ```powershell
-cd C:\path\to\blender-mcp
+cd C:\path\to\Hermes-blender-mcp
 .\install-windows.bat
 ```
 
 หรือทำเองทีละคำสั่ง:
 
 ```powershell
-cd C:\path\to\blender-mcp
+cd C:\path\to\Hermes-blender-mcp
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -76,7 +76,7 @@ py -3 -m venv .venv
 ### 🐧 Linux / 🍎 macOS
 
 ```bash
-cd /path/to/blender-mcp
+cd /path/to/Hermes-blender-mcp
 python3 -m venv .venv
 ./.venv/bin/pip install --upgrade pip
 ./.venv/bin/pip install -r requirements.txt
@@ -87,7 +87,7 @@ python3 -m venv .venv
 
 ```
 Blender: /usr/bin/blender (เจอใน PATH)
-สคริปต์สะพาน: /path/to/blender-mcp/blender_bridge.py ✅
+สคริปต์สะพาน: /path/to/Hermes-blender-mcp/blender_bridge.py ✅
 ```
 
 ถ้าขึ้น **"หา Blender ไม่เจอ"** ให้ระบุพาธเอง:
@@ -114,12 +114,12 @@ Blender: /usr/bin/blender (เจอใน PATH)
 
 ```powershell
 # Windows
-run-blender-mcp.bat --selftest
+run-hermes-blender-mcp.bat --selftest
 ```
 
 ```bash
 # Linux / macOS
-./run-blender-mcp.sh --selftest
+./run-hermes-blender-mcp.sh --selftest
 ```
 
 ควรเห็น:
@@ -157,17 +157,17 @@ Hermes มีตัวจัดการ MCP ในตัว — เชื่อ
 ```powershell
 # Windows (PowerShell)
 hermes mcp add blender `
-  --command "C:\path\to\blender-mcp\.venv\Scripts\python.exe" `
+  --command "C:\path\to\Hermes-blender-mcp\.venv\Scripts\python.exe" `
   --connect-timeout 120 `
-  --args C:\path\to\blender-mcp\blender_mcp_server.py
+  --args C:\path\to\Hermes-blender-mcp\blender_mcp_server.py
 ```
 
 ```bash
 # Linux / macOS
 hermes mcp add blender \
-  --command "/path/to/blender-mcp/.venv/bin/python" \
+  --command "/path/to/Hermes-blender-mcp/.venv/bin/python" \
   --connect-timeout 120 \
-  --args /path/to/blender-mcp/blender_mcp_server.py
+  --args /path/to/Hermes-blender-mcp/blender_mcp_server.py
 ```
 
 > ⚠️ **`--args` ต้องอยู่ท้ายสุดเสมอ** อะไรที่พิมพ์ต่อจาก `--args` จะถูกส่งเป็น
@@ -208,9 +208,9 @@ hermes mcp test blender  # → ✓ Connected · ✓ Tools discovered: 8
 ```yaml
 mcp_servers:
   blender:
-    command: C:\path\to\blender-mcp\.venv\Scripts\python.exe
+    command: C:\path\to\Hermes-blender-mcp\.venv\Scripts\python.exe
     args:
-      - C:\path\to\blender-mcp\blender_mcp_server.py
+      - C:\path\to\Hermes-blender-mcp\blender_mcp_server.py
     connect_timeout: 120.0
     enabled: true
     timeout: 300            # งาน 3D ใช้เวลาได้ (ค่าปริยาย 120)
@@ -222,8 +222,8 @@ mcp_servers:
 {
   "mcpServers": {
     "blender": {
-      "command": "C:\\path\\to\\blender-mcp\\.venv\\Scripts\\python.exe",
-      "args": ["C:\\path\\to\\blender-mcp\\blender_mcp_server.py"]
+      "command": "C:\\path\\to\\Hermes-blender-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\Hermes-blender-mcp\\blender_mcp_server.py"]
     }
   }
 }
@@ -273,7 +273,7 @@ mcp_servers:
 1. เปิด Blender → `Edit > Preferences > Add-ons`
 2. กดลูกศร **▼** (มุมขวาบน) → **Install from Disk…**
 3. เลือกไฟล์ `blender_mcp_bridge-1.0.0.zip`
-4. ติ๊กถูกที่ **"LPM Blender MCP Bridge"**
+4. ติ๊กถูกที่ **"Hermes Blender MCP Bridge"**
 
 ### 6ง. เริ่มสะพาน
 
@@ -363,7 +363,7 @@ hermes mcp remove blender        # หรือลบบรรทัดใน co
 แล้วลบโฟลเดอร์ `blender_mcp_bridge` ในโฟลเดอร์ addons
 
 ไม่มีอะไรถูกเขียนไว้นอกโฟลเดอร์โปรเจกต์ นอกจากโฟลเดอร์ add-on
-และไฟล์บันทึกในโฟลเดอร์ชั่วคราว (`%TEMP%\blender-mcp\` หรือ `/tmp/blender-mcp/`)
+และไฟล์บันทึกในโฟลเดอร์ชั่วคราว (`%TEMP%\Hermes-blender-mcp\` หรือ `/tmp/Hermes-blender-mcp/`)
 
 ---
 
@@ -378,7 +378,7 @@ hermes mcp remove blender        # หรือลบบรรทัดใน co
 | เรียกเครื่องมือแล้วหมดเวลา | เพิ่ม `timeout` ใน config / `--timeout` — **Blender ถูกสั่งหยุดกลางคันไม่ได้** ลูปยาวหรือเรนเดอร์จะทำต่อจนจบ |
 | add-on ขึ้นแต่บอกหาสะพานไม่เจอ | สองไฟล์ไม่ได้อยู่โฟลเดอร์เดียวกัน — ดูข้อ 6ค ใหม่ หรือตั้ง `BLENDER_MCP_DIR` |
 | ขึ้น "ถูกปฏิเสธเพราะฝ่าด่านความปลอดภัย" | เป็นไปตามการออกแบบ — ถ้าตั้งใจจริงส่ง `allow_unsafe=true` |
-| ดูบันทึก | `%TEMP%\blender-mcp\server-*.log` (Windows) หรือ `/tmp/blender-mcp/server-*.log` |
+| ดูบันทึก | `%TEMP%\Hermes-blender-mcp\server-*.log` (Windows) หรือ `/tmp/Hermes-blender-mcp/server-*.log` |
 
 ยังไม่หาย? เปิด issue พร้อมแนบบันทึกท้าย ๆ และผลของ
 `python blender_mcp_server.py --check`

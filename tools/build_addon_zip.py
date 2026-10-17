@@ -137,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"     • {n}")
     print("\nวิธีติดตั้ง:")
     print("  Blender → Edit > Preferences > Add-ons > ▼ (มุมขวาบน) > Install from Disk...")
-    print(f"  เลือกไฟล์ {target.name} แล้วติ๊กถูกที่ 'LPM Blender MCP Bridge'")
+    print(f"  เลือกไฟล์ {target.name} แล้วติ๊กถูกที่ 'Hermes Blender MCP Bridge'")
     return 0
 
 

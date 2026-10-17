@@ -562,7 +562,7 @@ def get_viewport_screenshot(filepath: str = "", width: int = 0, height: int = 0,
         "res_x": render.resolution_x, "res_y": render.resolution_y,
         "res_pct": render.resolution_percentage,
     }
-    target = filepath or str(pathlib.Path(tempfile.gettempdir()) / "blender-mcp" /
+    target = filepath or str(pathlib.Path(tempfile.gettempdir()) / "Hermes-blender-mcp" /
                              f"view-{int(time.time() * 1000)}.png")
     pathlib.Path(target).parent.mkdir(parents=True, exist_ok=True)
 
@@ -628,7 +628,7 @@ def get_viewport_screenshot(filepath: str = "", width: int = 0, height: int = 0,
 POLYHAVEN_API = "https://api.polyhaven.com"
 # ⚠️ User-Agent ต้องเป็น ASCII เท่านั้น — HTTP header เข้ารหัสเป็น latin-1
 # (เคยใส่ชื่อไทยตรงนี้แล้ว urllib โยน UnicodeEncodeError — เทสต์ออนไลน์จับได้)
-POLYHAVEN_UA = "blender-mcp-lpm/1.0 (LPM school project; +https://polyhaven.com)"
+POLYHAVEN_UA = "Hermes-blender-mcp-lpm/1.0 (LPM school project; +https://polyhaven.com)"
 POLYHAVEN_TYPES = ("hdris", "textures", "models")
 _PH_LIST_CACHE: dict[str, dict] = {}
 
@@ -807,7 +807,7 @@ def download_polyhaven_asset(asset_id: str, kind: str = "gltf", resolution: str 
         raise ToolError(f"ไม่พบไฟล์ของ '{asset_id}'")
 
     cache = pathlib.Path(target_dir) if target_dir else (
-        pathlib.Path(tempfile.gettempdir()) / "blender-mcp" / "polyhaven" /
+        pathlib.Path(tempfile.gettempdir()) / "Hermes-blender-mcp" / "polyhaven" /
         f"{asset_id}_{resolution}")
     max_bytes = int(float(max_mb) * 1_000_000)
 

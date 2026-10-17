@@ -45,8 +45,8 @@
 ต้องมี Python 3.10 ขึ้นไป (ไม่ต้องมี Blender ก็พัฒนาได้)
 
 ```bash
-git clone https://github.com/<OWNER>/blender-mcp.git
-cd blender-mcp
+git clone https://github.com/<OWNER>/Hermes-blender-mcp.git
+cd Hermes-blender-mcp
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt     # Windows: .\.venv\Scripts\python.exe -m pip ...
 
@@ -57,8 +57,8 @@ python3 -m venv .venv
 บนเครื่องที่มี Blender จะรันตรวจเต็มรูปแบบได้:
 
 ```bash
-./run-blender-mcp.sh --check      # เจอ Blender ไหม
-./run-blender-mcp.sh --selftest   # เปิด Blender จริง ไล่เรียกทุกเครื่องมือ
+./run-hermes-blender-mcp.sh --check      # เจอ Blender ไหม
+./run-hermes-blender-mcp.sh --selftest   # เปิด Blender จริง ไล่เรียกทุกเครื่องมือ
 ```
 
 ---
@@ -211,7 +211,7 @@ python tools/build_addon_zip.py    # ถ้าแก้ไฟล์ใน blende
 1. ผลของ `python blender_mcp_server.py --check`
 2. เวอร์ชัน Blender (`blender --version`) และระบบปฏิบัติการ
 3. **ข้อความ error ตรงตัว** (คัดลอกทั้งบรรทัด ไม่ต้องแปล)
-4. บันทึกท้าย ๆ: `%TEMP%\blender-mcp\server-*.log` หรือ `/tmp/blender-mcp/server-*.log`
+4. บันทึกท้าย ๆ: `%TEMP%\Hermes-blender-mcp\server-*.log` หรือ `/tmp/Hermes-blender-mcp/server-*.log`
 5. ขั้นตอนที่ทำก่อนเจอปัญหา (คำสั่ง/คำสั่งของ AI ที่ใช้)
 
 > ⚠️ ถ้าเป็น "หา Blender ไม่เจอ" ให้ลอง `--blender "<พาธเต็ม>"` ก่อน —

@@ -1,4 +1,4 @@
-# 02 — ต่อ LPM Blender MCP เข้ากับ Hermes Agent
+# 02 — ต่อ Hermes Blender MCP เข้ากับ Hermes Agent
 
 คู่มือนี้เขียนจาก **คำสั่งจริงที่รันและได้ผลจริง** บนเครื่องนี้ (ไม่ใช่จากความจำ)
 Hermes มีคำสั่งจัดการ MCP ในตัว — ไม่ต้องแก้ YAML เอง
@@ -39,18 +39,18 @@ python3 -c "import mcp; print('ok')"
 
 ```bash
 hermes mcp add blender \
-  --command "C:\blender-mcp\.venv\Scripts\python.exe" \
+  --command "C:\Hermes-blender-mcp\.venv\Scripts\python.exe" \
   --connect-timeout 120 \
-  --args C:\blender-mcp\blender_mcp_server.py
+  --args C:\Hermes-blender-mcp\blender_mcp_server.py
 ```
 
 Linux / macOS:
 
 ```bash
 hermes mcp add blender \
-  --command "/path/to/blender-mcp/.venv/bin/python" \
+  --command "/path/to/Hermes-blender-mcp/.venv/bin/python" \
   --connect-timeout 120 \
-  --args /path/to/blender-mcp/blender_mcp_server.py
+  --args /path/to/Hermes-blender-mcp/blender_mcp_server.py
 ```
 
 ### ข) ระบุไฟล์ `.blend` ที่จะเปิด
@@ -113,7 +113,7 @@ hermes mcp remove blender      # เอาออก
 
 ```
   Testing 'blender'...
-  Transport: stdio → C:\blender-mcp\.venv\Scripts\python.exe
+  Transport: stdio → C:\Hermes-blender-mcp\.venv\Scripts\python.exe
   Auth: none
   ✓ Connected (1950ms)
   ✓ Tools discovered: 8
@@ -128,9 +128,9 @@ Hermes เขียนรูปแบบนี้จริง (คัดจา�
 ```yaml
 mcp_servers:
   blender:
-    command: C:\blender-mcp\.venv\Scripts\python.exe
+    command: C:\Hermes-blender-mcp\.venv\Scripts\python.exe
     args:
-      - C:\blender-mcp\blender_mcp_server.py
+      - C:\Hermes-blender-mcp\blender_mcp_server.py
       - --blend-file
       - C:\งาน\บ้าน.blend
     connect_timeout: 120.0
@@ -159,7 +159,7 @@ Hermes ส่งตัวแปรสภาพแวดล้อมแบบ **�
 
 ```yaml
     args:
-      - C:\blender-mcp\blender_mcp_server.py
+      - C:\Hermes-blender-mcp\blender_mcp_server.py
       - --blender
       - D:\Apps\Blender 5.2\blender.exe
 ```
@@ -181,8 +181,8 @@ Claude Desktop และไคลเอนต์อื่นใช้รูป�
 {
   "mcpServers": {
     "blender": {
-      "command": "C:\\blender-mcp\\.venv\\Scripts\\python.exe",
-      "args": ["C:\\blender-mcp\\blender_mcp_server.py"],
+      "command": "C:\\Hermes-blender-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["C:\\Hermes-blender-mcp\\blender_mcp_server.py"],
       "env": {}
     }
   }

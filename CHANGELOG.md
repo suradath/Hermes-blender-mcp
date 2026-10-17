@@ -144,7 +144,7 @@
 
 **การติดตั้งและเอกสาร**
 - `install-windows.bat` — ติดตั้งครบในคำสั่งเดียว (venv + แพ็กเกจ + ตรวจเจอ Blender)
-- `run-blender-mcp.bat` / `.sh` — ตัวเปิดเซิร์ฟเวอร์และคำสั่งตรวจวินิจฉัย
+- `run-hermes-blender-mcp.bat` / `.sh` — ตัวเปิดเซิร์ฟเวอร์และคำสั่งตรวจวินิจฉัย
 - `tools/build_addon_zip.py` — สร้าง zip สำหรับ `Install from Disk` ใน Blender
   (อ่านเลขเวอร์ชันจาก `bl_info` ตั้งชื่อไฟล์เอง และตรวจโครงสร้างก่อนคืนค่า)
 - **`--install-addon` / `--uninstall-addon`** — คัดลอก add-on ไปไว้ในโฟลเดอร์ของ Blender ให้เอง
@@ -219,5 +219,5 @@
 - …
 -->
 
-[Unreleased]: https://github.com/OWNER/blender-mcp/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/OWNER/blender-mcp/releases/tag/v1.0.0
+[Unreleased]: https://github.com/OWNER/Hermes-blender-mcp/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/OWNER/Hermes-blender-mcp/releases/tag/v1.0.0

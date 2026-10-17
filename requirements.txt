@@ -1,4 +1,4 @@
-# LPM Blender MCP — แพ็กเกจที่ต้องใช้ (เฉพาะ MCP server)
+# Hermes Blender MCP — แพ็กเกจที่ต้องใช้ (เฉพาะ MCP server)
 #
 # ต้องใช้กับ Python ของ "เครื่อง" ไม่ใช่ Python ที่มากับ Blender
 # (Blender ไม่ต้องติดตั้งอะไรเลย — blender_bridge.py ใช้แค่ stdlib)

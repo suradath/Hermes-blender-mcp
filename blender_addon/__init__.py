@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-LPM Blender MCP Bridge — ส่วนเสริม (Add-on) สำหรับ Blender 5.2
+Hermes Blender MCP Bridge — ส่วนเสริม (Add-on) สำหรับ Blender 5.2
 ================================================================
 
 ใช้เมื่อคุณ **เปิด Blender พร้อมหน้าต่างอยู่แล้ว** และอยากให้ Hermes เข้ามาสั่งงาน
@@ -27,7 +27,7 @@ LPM Blender MCP Bridge — ส่วนเสริม (Add-on) สำหรั�
 """
 
 bl_info = {
-    "name": "LPM Blender MCP Bridge",
+    "name": "Hermes Blender MCP Bridge",
     "author": "LPM-AI-AST / โรงเรียนลำปลายมาศ",
     "version": (1, 0, 0),
     "blender": (4, 0, 0),

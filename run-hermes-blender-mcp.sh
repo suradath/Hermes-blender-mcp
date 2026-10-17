@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  LPM Blender MCP — ตัวเปิด MCP server (Linux / macOS)
+#  Hermes Blender MCP — ตัวเปิด MCP server (Linux / macOS)
 #  ปกติ Hermes จะเรียกให้เองตาม config.yaml
-#  ลองเองได้:  ./run-blender-mcp.sh --check      (ตรวจว่าเจอ Blender ไหม)
-#              ./run-blender-mcp.sh --selftest   (เปิด Blender แล้วลองทุกเครื่องมือ)
+#  ลองเองได้:  ./run-hermes-blender-mcp.sh --check      (ตรวจว่าเจอ Blender ไหม)
+#              ./run-hermes-blender-mcp.sh --selftest   (เปิด Blender แล้วลองทุกเครื่องมือ)
 #  ⚠️  ห้ามรันเฉย ๆ — มันจะรอคำสั่ง JSON-RPC ทาง stdin
 # ============================================================================
 set -euo pipefail

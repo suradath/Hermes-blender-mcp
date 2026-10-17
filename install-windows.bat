@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM  LPM Blender MCP — ติดตั้งสำหรับ Windows 11 (รันครั้งเดียว)
+REM  Hermes Blender MCP — ติดตั้งสำหรับ Windows 11 (รันครั้งเดียว)
 REM  ดับเบิลคลิกไฟล์นี้ หรือรันใน cmd/PowerShell:  install-windows.bat
 REM ============================================================================
 setlocal EnableDelayedExpansion
@@ -8,7 +8,7 @@ cd /d "%~dp0"
 
 echo.
 echo ============================================================
-echo   ติดตั้ง LPM Blender MCP สําหรับ Windows 11
+echo   ติดตั้ง Hermes Blender MCP สําหรับ Windows 11
 echo ============================================================
 echo.
 

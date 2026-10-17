@@ -1,7 +1,7 @@
 # 01 — ติดตั้งบน Windows 11 (ทีละขั้น)
 
 คู่มือนี้สำหรับ **Windows 11** โดยเฉพาะ ทุกคำสั่งคัดลอกวางได้เลย
-(ปรับพาธ `C:\blender-mcp` ให้ตรงกับที่คุณวางโฟลเดอร์)
+(ปรับพาธ `C:\Hermes-blender-mcp` ให้ตรงกับที่คุณวางโฟลเดอร์)
 
 ---
 
@@ -38,10 +38,10 @@ C:\Program Files\Blender Foundation\Blender 5.2
 
 ## ขั้นที่ 2 — ติดตั้งโปรแกรม (คำสั่งเดียว)
 
-วางโฟลเดอร์โปรเจกต์ไว้ที่ `C:\blender-mcp` แล้วเปิด PowerShell:
+วางโฟลเดอร์โปรเจกต์ไว้ที่ `C:\Hermes-blender-mcp` แล้วเปิด PowerShell:
 
 ```powershell
-cd C:\blender-mcp
+cd C:\Hermes-blender-mcp
 .\install-windows.bat
 ```
 
@@ -58,7 +58,7 @@ cd C:\blender-mcp
 ระบุพาธเอง:
 
 ```powershell
-C:\blender-mcp\.venv\Scripts\python.exe C:\blender-mcp\blender_mcp_server.py `
+C:\Hermes-blender-mcp\.venv\Scripts\python.exe C:\Hermes-blender-mcp\blender_mcp_server.py `
   --check --blender "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe"
 ```
 
@@ -66,7 +66,7 @@ C:\blender-mcp\.venv\Scripts\python.exe C:\blender-mcp\blender_mcp_server.py `
 
 ```
 Blender: C:\Program Files\Blender Foundation\Blender 5.2\blender.exe (ระบุเองจาก --blender)
-สคริปต์สะพาน: C:\blender-mcp\blender_bridge.py ✅
+สคริปต์สะพาน: C:\Hermes-blender-mcp\blender_bridge.py ✅
 ```
 
 ---
@@ -74,7 +74,7 @@ Blender: C:\Program Files\Blender Foundation\Blender 5.2\blender.exe (ระบ�
 ## ขั้นที่ 3 — ทดสอบว่าใช้งานได้จริง
 
 ```powershell
-C:\blender-mcp\run-blender-mcp.bat --selftest
+C:\Hermes-blender-mcp\run-hermes-blender-mcp.bat --selftest
 ```
 
 คำสั่งนี้จะ **เปิด Blender จริง** แล้วไล่เรียกทุกเครื่องมือให้ดูผลทีละตัว:
@@ -108,9 +108,9 @@ Hermes มีคำสั่งจัดการ MCP ในตัว ใช้�
 
 ```powershell
 hermes mcp add blender `
-  --command "C:\blender-mcp\.venv\Scripts\python.exe" `
+  --command "C:\Hermes-blender-mcp\.venv\Scripts\python.exe" `
   --connect-timeout 120 `
-  --args C:\blender-mcp\blender_mcp_server.py
+  --args C:\Hermes-blender-mcp\blender_mcp_server.py
 ```
 
 > ⚠️ **`--args` ต้องอยู่ท้ายสุดเสมอ** ถ้าเอา `--connect-timeout` ไปไว้ข้างหลัง
@@ -125,9 +125,9 @@ hermes mcp add blender `
 
 ```powershell
 hermes mcp add blender `
-  --command "C:\blender-mcp\.venv\Scripts\python.exe" `
+  --command "C:\Hermes-blender-mcp\.venv\Scripts\python.exe" `
   --connect-timeout 120 `
-  --args C:\blender-mcp\blender_mcp_server.py --blend-file "C:\งาน\บ้าน.blend"
+  --args C:\Hermes-blender-mcp\blender_mcp_server.py --blend-file "C:\งาน\บ้าน.blend"
 ```
 
 ---
@@ -166,16 +166,16 @@ explorer "$env:APPDATA\Blender Foundation\Blender\5.2\scripts\addons"
 └── blender_bridge.py      ← จากโฟลเดอร์โปรเจกต์
 ```
 
-3. เปิด Blender → `Edit > Preferences > Add-ons` → ค้นหา **"LPM Blender MCP"** → ติ๊กเปิด
+3. เปิด Blender → `Edit > Preferences > Add-ons` → ค้นหา **"Hermes Blender MCP"** → ติ๊กเปิด
 4. กด `N` ในมุมมอง 3D → แท็บ **"Blender MCP"** → กด **"เริ่มสะพาน (Start bridge)"**
 5. จะเห็นพอร์ต (ค่าปริยาย 9876) และ token — กด **"คัดลอกคำสั่งเชื่อมต่อ"**
 6. สั่ง Hermes ให้ใช้โหมด attach:
 
 ```powershell
 hermes mcp add blender `
-  --command "C:\blender-mcp\.venv\Scripts\python.exe" `
+  --command "C:\Hermes-blender-mcp\.venv\Scripts\python.exe" `
   --connect-timeout 60 `
-  --args C:\blender-mcp\blender_mcp_server.py --attach 127.0.0.1:9876 --token "วาง_TOKEN"
+  --args C:\Hermes-blender-mcp\blender_mcp_server.py --attach 127.0.0.1:9876 --token "วาง_TOKEN"
 ```
 
 > 💡 ในโหมดนี้ Blender ต้องเปิดอยู่และกด "เริ่มสะพาน" ไว้ก่อนเสมอ
