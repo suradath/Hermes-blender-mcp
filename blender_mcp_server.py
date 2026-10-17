@@ -52,7 +52,7 @@ from mcp.types import TextContent
 
 HERE = pathlib.Path(__file__).resolve().parent
 BRIDGE_SCRIPT = HERE / "blender_bridge.py"
-SERVER_VERSION = "1.0.8"
+SERVER_VERSION = "1.0.9"
 MIN_BLENDER = (4, 0)          # ใช้ API ที่มีมาตั้งแต่ 4.0 (5.2 คือเป้าหมาย)
 # เวอร์ชันโปรโตคอลระหว่างเซิร์ฟเวอร์กับสะพาน — ต้องตรงกัน ไม่งั้นมักแปลว่า
 # add-on ที่ติดตั้งไว้เป็นเวอร์ชันเก่า (bridge เก่าคุยกับเซิร์ฟเวอร์ใหม่)
@@ -472,6 +472,11 @@ class BlenderProcess:
                 except json.JSONDecodeError:
                     obj = None
                 if isinstance(obj, dict) and obj.get("bridge_ready") and obj.get("port"):
+                    if self._ready.is_set():
+                        # ต่อสำเร็จแล้ว — ready line อื่น (เช่น add-on ที่รันใน Blender
+                        # เดียวกันและประกาศพอร์ต 9876) ต้องไม่มาเขียนทับพอร์ตเดิม
+                        log(f"ข้าม ready line ของสะพานอื่น (พอร์ต {obj['port']})")
+                        continue
                     self.port = int(obj["port"])
                     log(f"สะพานพร้อมที่พอร์ต {self.port}")
                     self._ready.set()
