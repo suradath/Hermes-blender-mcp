@@ -19,6 +19,16 @@ sys.path.insert(0, str(ROOT))
 
 import blender_mcp_server as srv  # noqa: E402
 
+# ── ทำให้เทสต์ไม่ขึ้นกับสภาพแวดล้อมของเครื่องที่รัน ────────────────────────────
+# บทเรียนจาก CI: เทสต์ผ่านบนเครื่องพัฒนาแต่ล้มบน runner เพราะโค้ดจริงให้
+# ความสำคัญกับตัวแปรสภาพแวดล้อมมากกว่า Path.home() ที่เทสต์จำลองไว้ เช่น
+#   _blender_config_root(): XDG_CONFIG_HOME  มาก่อน  home/".config"
+#   _windows_roots():       PROGRAMFILES / LOCALAPPDATA มาก่อนค่าถอย
+# ถ้าเครื่องรันตั้งค่าเหล่านี้ไว้ ผลจะเปลี่ยนตามเครื่อง ไม่ใช่ตามโค้ด
+for _k in ("XDG_CONFIG_HOME", "APPDATA", "LOCALAPPDATA",
+           "PROGRAMFILES", "ProgramFiles", "PROGRAMW6432", "BLENDER_EXE"):
+    os.environ.pop(_k, None)
+
 passed = 0
 failed: list[str] = []
 

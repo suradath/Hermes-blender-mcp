@@ -13,6 +13,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# ต้องมีสิทธิ์เขียน เพื่อโพสต์รายละเอียดเมื่อชุดทดสอบล้ม (commit comment สาธารณะ)
+permissions:
+  contents: write
+
 jobs:
   test:
     name: tests (Python ${{ matrix.python-version }})
@@ -62,13 +66,14 @@ jobs:
       - name: รันชุดทดสอบทั้งหมด
         run: bash tests/run_all.sh
 
-      # log ของ runner ต้องล็อกอินถึงจะอ่านได้ แต่ **job summary เปิดเผยสาธารณะ**
-      # จึงเขียนรายละเอียดของชุดที่ล้มลงไป เพื่อให้ตรวจจากระยะไกลได้โดยไม่ต้องมีสิทธิ์
-      - name: รายละเอียดเมื่อล้ม (ขึ้นใน job summary)
+      # log ของ runner ต้องล็อกอินถึงจะอ่านได้ แต่ **commit comment เปิดเผยสาธารณะ**
+      # จึงโพสต์รายละเอียดของชุดที่ล้มไว้ที่ commit นั้น เพื่อให้ตรวจจากระยะไกลได้
+      # โดยไม่ต้องมีสิทธิ์เข้าถึง repo  (ต้องมี permissions: contents: write)
+      - name: รายละเอียดเมื่อล้ม (ขึ้นใน job summary + commit comment)
         if: failure()
         run: |
           {
-            echo "## ❌ ชุดทดสอบที่ล้ม"
+            echo "## ❌ ชุดทดสอบที่ล้ม (Python ${{ matrix.python-version }})"
             found=0
             for f in /tmp/blender_mcp_test_*.log; do
               [ -f "$f" ] || continue
@@ -86,4 +91,8 @@ jobs:
               echo "ไม่พบ log ของชุดที่ล้ม (อาจล้มก่อนถึงขั้นรันชุดทดสอบ)"
               ls -la /tmp/blender_mcp_test_*.log 2>/dev/null || echo "ไม่มีไฟล์ log เลย"
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          } > /tmp/report.md
+          cat /tmp/report.md >> "$GITHUB_STEP_SUMMARY"
+          head -c 60000 /tmp/report.md > /tmp/report-trim.md
+          gh api -X POST "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+            -F body=@/tmp/report-trim.md || echo "โพสต์ commit comment ไม่สำเร็จ"
