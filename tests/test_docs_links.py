@@ -55,6 +55,8 @@ section("[1] เอกสารที่ต้องมีสำหรับร�
 for name, why in (("README.md", "หน้าหลักของรีโป"),
                   ("INSTALL.md", "คู่มือติดตั้ง (อังกฤษ)"),
                   ("INSTALL.th.md", "คู่มือติดตั้ง (ไทย)"),
+                  ("CONTRIBUTING.md", "วิธีร่วมพัฒนา"),
+                  ("CHANGELOG.md", "บันทึกการเปลี่ยนแปลง"),
                   ("LICENSE", "สัญญาอนุญาต — รีโปสาธารณะควรมี"),
                   (".gitattributes", "กันปัญหา CRLF/LF ข้ามระบบ"),
                   (".github/workflows/tests.yml", "รันเทสต์อัตโนมัติบน GitHub"),
@@ -88,6 +90,27 @@ for doc in DOCS:
 
 check("พบลิงก์ภายในให้ตรวจมากพอ (!= 0)", total_links > 10, f"พบ {total_links}")
 
+section("[2.1] เอกสารที่รีโปสาธารณะควรอ้างถึงกัน")
+readme_now = (ROOT / "README.md").read_text(encoding="utf-8")
+for must in ("CONTRIBUTING.md", "CHANGELOG.md"):
+    check(f"README ลิงก์ไปที่ {must}", must in readme_now, "ไม่มีใน README")
+# CHANGELOG ต้องอ้างถึง Keep a Changelog และชี้วิธีเพิ่มรายการ
+changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+check("CHANGELOG อ้างอิงรูปแบบ Keep a Changelog", "Keep a Changelog" in changelog)
+check("CHANGELOG มีหัวข้อ [Unreleased] ให้คนอื่นเติม", "## [Unreleased]" in changelog)
+check("CHANGELOG อธิบายวิธีเพิ่มรายการ (ห้ามตั้งเลขเวอร์ชันเอง)",
+      "อย่าตั้งเลขเวอร์ชัน" in changelog, "ต้องบอกว่าผู้ดูแลตัดเวอร์ชันเอง")
+contrib = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+for topic, kw in (("วิธีรันเทสต์", "run_all.sh"),
+                  ("กฎ stdout ห้ามสกปรก", "stdout"),
+                  ("ห้ามเรียก bpy ข้ามเธรด", "thread"),
+                  ("ต้องห่อ error ด้วย ToolError", "ToolError"),
+                  ("สูตรเพิ่มเครื่องมือใหม่", "@srv.tool"),
+                  ("แก้จำนวนเครื่องมือในเทสต์ด้วย", "len(names) == 8"),
+                  ("รายงานบั๊ก", "รายงานบั๊ก"),
+                  ("ความปลอดภัย/ไม่ใช่ sandbox", "sandbox")):
+    check(f"CONTRIBUTING สอนเรื่อง «{topic}»", kw in contrib, kw)
+
 section("[3] ลิงก์ที่ README อ้างว่าสำคัญต้องมีจริง")
 readme = (ROOT / "README.md").read_text(encoding="utf-8")
 for must in ("INSTALL.th.md", "INSTALL.md", "LICENSE", "docs/02-Hermes-config.md",
@@ -108,6 +131,47 @@ for topic, th_kw, en_kw in (("คำเตือน --args ท้ายสุด
                             ("ตารางแก้ปัญหา", "แก้ปัญหา", "Troubleshooting")):
     check(f"ไทยมีเรื่อง «{topic}»", th_kw.lower() in th.lower(), th_kw)
     check(f"อังกฤษมีเรื่อง «{topic}»", en_kw.lower() in en.lower(), en_kw)
+
+section("[5] ไม่มีอักษรต่างชาติหลุด (บทเรียนจริง: เคยหลุด 2 ครั้ง)")
+
+# อักษรที่ *ไม่ควร* ปรากฏ: ไทย (0E00-0E7F) และละตินพื้นฐาน/อีโมจิ/เครื่องหมายวรรคตอน = ผ่าน
+FOREIGN_BLOCKS = [
+    (0x00C0, 0x024F, "ละตินมีเครื่องหมายกำกับ U+00C0–U+024F"),
+    (0x0370, 0x03FF, "กรีก"),
+    (0x0400, 0x04FF, "ซีริลลิก"),
+    (0x0530, 0x058F, "อาร์เมเนีย"),
+    (0x0590, 0x05FF, "ฮีบรู"),
+    (0x0600, 0x06FF, "อาหรับ"),
+    (0x3040, 0x30FF, "ญี่ปุ่น"),
+    (0x4E00, 0x9FFF, "จีน"),
+    (0xAC00, 0xD7AF, "เกาหลี"),
+]
+ALLOWED_CHARS = {"\u00d7", "\u00f7"}   # × ÷ (อยู่ในช่วงละตินแต่เป็นสัญลักษณ์คณิต)
+SUFFIXES = {".py", ".md", ".txt", ".bat", ".sh", ".yml", ".yaml", ".json"}
+SKIP = {".venv", "dist", "__pycache__", ".git", "node_modules"}
+
+offenders: list[tuple[pathlib.Path, int, str, str]] = []
+scanned = 0
+for f in sorted(ROOT.rglob("*")):
+    if not f.is_file() or f.suffix not in SUFFIXES:
+        continue
+    if any(part in SKIP for part in f.parts):
+        continue
+    scanned += 1
+    for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        for ch in line:
+            if ch in ALLOWED_CHARS:
+                continue
+            o = ord(ch)
+            for lo, hi, name in FOREIGN_BLOCKS:
+                if lo <= o <= hi:
+                    offenders.append((f.relative_to(ROOT), i, ch, name))
+                    break
+
+check("สแกนไฟล์ข้อความครบ (!= 0)", scanned > 10, f"สแกน {scanned} ไฟล์")
+check("ไม่มีอักษรต่างชาติหลุดเลย (ไทย/ละติน/อีโมจิ ผ่าน)",
+      not offenders,
+      "; ".join(f"{f}:{i} {c!r} ({n})" for f, i, c, n in offenders[:5]))
 
 print()
 print("=" * 70)
