@@ -528,12 +528,24 @@ class Runtime:
         self.client = BridgeClient("127.0.0.1", 0, "", timeout=cfg.timeout)
         self.proc: BlenderProcess | None = None
         self._lock = threading.Lock()
+        # กัน "Blender เปิดแล้วปิดรัว ๆ": ถ้าเพิ่งล้มเหลว อย่าเปิดใหม่ทันที
+        # (Hermes จะเรียกเครื่องมือซ้ำ ๆ → เดิมเปิด/ปิด Blender ทุกครั้ง)
+        self._fail_at: float = 0.0
+        self._fail_msg: str = ""
+        self._fail_cooldown = 20.0
 
     # --------------------------------------------------------- เตรียมพร้อม
     def ensure(self) -> BridgeClient:
         with self._lock:
             if self.client.connected:
                 return self.client
+
+            # เพิ่งล้มเหลวเมื่อครู่ → ไม่ต้องเปิด Blender ใหม่ (กันหน้าต่างเด้งรัว ๆ)
+            if self._fail_msg and (time.monotonic() - self._fail_at) < self._fail_cooldown:
+                left = int(self._fail_cooldown - (time.monotonic() - self._fail_at))
+                raise BridgeError(
+                    f"ยังต่อ Blender ไม่ได้ (จะลองใหม่ในอีก {left} วินาที) — "
+                    f"สาเหตุครั้งก่อน: {self._fail_msg}")
 
             if self.cfg.attach:
                 host, _, port = self.cfg.attach.rpartition(":")
@@ -557,6 +569,7 @@ class Runtime:
                 tail = self.proc.tail()
                 self.proc.stop()
                 self.proc = None
+                self._fail_at, self._fail_msg = time.monotonic(), "Blender ไม่พร้อมภายในเวลาที่กำหนด"
                 raise BridgeError(
                     f"Blender ไม่พร้อมภายใน {self.cfg.spawn_timeout:.0f} วินาที — "
                     f"บันทึกท้าย ๆ:\n{tail}\n"
@@ -573,8 +586,10 @@ class Runtime:
                     f"บันทึกท้าย ๆ:\n{tail}")
             try:
                 self.client.connect(timeout=30)
-            except BridgeError:
+            except BridgeError as exc:
                 # กัน Blender ค้างเป็นหน้าต่างผีหลังต่อไม่ติด (เจอจริง: เปิดค้างหลายบาน)
+                self._fail_at = time.monotonic()
+                self._fail_msg = str(exc).splitlines()[0][:200]
                 tail = self.proc.tail()
                 self.proc.stop()
                 self.proc = None
@@ -582,6 +597,7 @@ class Runtime:
             warn = check_bridge_protocol(self.client.info)
             if warn:
                 log(f"⚠️  {warn}")
+            self._fail_msg = ""          # สำเร็จ → ล้างสถานะล้มเหลว
             log(f"พร้อมใช้งาน · Blender {self.client.info.get('blender')} · "
                 f"ไฟล์ {self.client.info.get('filepath') or '(ยังไม่บันทึก)'}")
             return self.client
