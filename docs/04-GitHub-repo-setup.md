@@ -12,13 +12,13 @@
 **ภาษาไทย (แนะนำถ้าเน้นคนไทย):**
 
 ```
-MCP Server ให้ Hermes Agent สั่งงาน Blender 5.2 ผ่าน bpy — 12 เครื่องมือ · คลังของฟรี CC0 · ตัวสร้างโมเดลโพลิกอน · ทดสอบ 797 ข้อ
+MCP Server ให้ Hermes Agent สั่งงาน Blender 5.2 ผ่าน bpy — 12 เครื่องมือ · คลังของฟรี CC0 · ตัวสร้างโมเดลโพลิกอน · ทดสอบ 805 ข้อ
 ```
 
 **English (แนะนำถ้าอยากให้คนนอกเข้าถึง):**
 
 ```
-MCP server letting Hermes Agent drive Blender 5.2 via bpy — 12 tools, keyless CC0 assets, procedural low-poly generators, 797 tests.
+MCP server letting Hermes Agent drive Blender 5.2 via bpy — 12 tools, keyless CC0 assets, procedural low-poly generators, 805 tests.
 ```
 
 ---
@@ -38,7 +38,7 @@ MCP server letting Hermes Agent drive Blender 5.2 via bpy — 12 tools, keyless 
 ```
 MCP Server (stdio) สำหรับ Hermes Agent ขับ Blender 5.2 ผ่าน bpy: อ่านฉาก สร้าง/ขยับวัตถุ ใส่สี
 รันสคริปต์ ถ่ายภาพหน้าจอ คลัง HDRI/โมเดล CC0 ที่ไม่ต้องใช้คีย์ และตัวสร้างโมเดลโพลิกอน
-(ตัวละคร บ้านทรงไทย ต้นไม้ สุนัข ฉากหมู่) — ทุกชั้นทดสอบอัตโนมัติ 797 ข้อ
+(ตัวละคร บ้านทรงไทย ต้นไม้ สุนัข ฉากหมู่) — ทุกชั้นทดสอบอัตโนมัติ 805 ข้อ
 ```
 
 **อังกฤษ:**
@@ -46,7 +46,7 @@ MCP Server (stdio) สำหรับ Hermes Agent ขับ Blender 5.2 ผ่�
 Stdio MCP server that lets Hermes Agent (or any MCP client) read and drive Blender 5.2 through bpy:
 scene inspection, object creation/transform, materials, script execution, viewport screenshots,
 a keyless CC0 asset library (HDRIs/textures/models) and procedural low-poly generators —
-verified by 797 automated checks.
+verified by 805 automated checks.
 ```
 
 ---
@@ -97,10 +97,10 @@ GitHub แนะนำขนาด **1280×640 px** · ใช้ภาพจา�
 # สร้าง repo ใหม่ + ผูก remote + push + ใส่ description และ topics
 cd /data/coding/Hermes-blender-mcp
 gh repo create Hermes-blender-mcp --public --source . --remote origin --push \
-  --description "MCP Server ให้ Hermes Agent สั่งงาน Blender 5.2 ผ่าน bpy — 12 เครื่องมือ · คลังของฟรี CC0 · ตัวสร้างโมเดลโพลิกอน · ทดสอบ 797 ข้อ"
+  --description "MCP Server ให้ Hermes Agent สั่งงาน Blender 5.2 ผ่าน bpy — 12 เครื่องมือ · คลังของฟรี CC0 · ตัวสร้างโมเดลโพลิกอน · ทดสอบ 805 ข้อ"
 
 # ถ้ามี repo อยู่แล้ว ใส่ description/topics ทีหลัง
-gh repo edit --description "MCP server letting Hermes Agent drive Blender 5.2 via bpy — 12 tools, keyless CC0 assets, procedural low-poly generators, 797 tests."
+gh repo edit --description "MCP server letting Hermes Agent drive Blender 5.2 via bpy — 12 tools, keyless CC0 assets, procedural low-poly generators, 805 tests."
 for t in mcp model-context-protocol blender bpy hermes-agent ai-agent python \
          procedural-generation low-poly polyhaven 3d-modeling automation windows thai mit-license; do
   gh repo edit --add-topic "$t"
