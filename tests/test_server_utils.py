@@ -269,6 +269,16 @@ if failed:
     print(f"❌ ล้มเหลว {len(failed)} จากทั้งหมด {passed + len(failed)}")
     for f in failed:
         print("   • " + f)
+    # บริบทของเครื่องที่รัน — ต่างกันระหว่างเครื่องพัฒนากับ CI บ่อยมาก
+    print(f"   [env] python={sys.version.split()[0]} platform={sys.platform} "
+          f"uid={getattr(os, 'getuid', lambda: 'n/a')()} "
+          f"HOME={os.environ.get('HOME', '(ไม่มี)')} "
+          f"XDG_CONFIG_HOME={os.environ.get('XDG_CONFIG_HOME', '(ไม่มี)')} "
+          f"cwd={os.getcwd()}")
+    # ให้ GitHub Actions รายงานเป็น annotation (อ่านได้โดยไม่ต้องมีสิทธิ์ดู log)
+    if os.environ.get("GITHUB_ACTIONS"):
+        detail = " ; ".join(failed[:6]).replace("%", "%25").replace("\n", " ")
+        print(f"::error title=test_server_utils::{detail}")
     sys.exit(1)
 print(f"✅ ผ่านทั้งหมด {passed} รายการ")
 sys.exit(0)
