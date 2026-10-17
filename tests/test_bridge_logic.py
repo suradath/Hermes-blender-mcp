@@ -303,9 +303,10 @@ check("hello → บอกว่ารันแบบ background", r["result"]["
 
 r = br.handle_message({"id": 9, "method": "list_tools"})
 names = [t["name"] for t in r["result"]]
-check("list_tools → 9 เครื่องมือ (เพิ่ม get_viewport_screenshot)", len(names) == 9, str(names))
+check("list_tools → 12 เครื่องมือ", len(names) == 12, str(names))
 for want in ("get_scene_hierarchy", "add_primitive_mesh", "modify_object_transform",
-             "execute_blender_script"):
+             "execute_blender_script", "get_viewport_screenshot",
+             "search_polyhaven", "get_polyhaven_info", "download_polyhaven_asset"):
     check(f"มีเครื่องมือบังคับ: {want}", want in names)
 check("ทุกเครื่องมือมีคำอธิบายให้ AI อ่าน",
       all(len(t["description"]) > 30 for t in r["result"]))
@@ -331,7 +332,7 @@ r = br.handle_message({"id": 2, "method": "call_tool",
                        "params": {"name": "get_scene_hierarchy", "arguments": {}}})
 check("เรียกซ้ำหลัง error ยังทำงานปกติ", r["ok"] is True, str(r)[:120])
 check("จำนวนเครื่องมือคงที่ ไม่สะสมซ้ำ",
-      len(br.handle_message({"id": 3, "method": "list_tools"})["result"]) == 9)
+      len(br.handle_message({"id": 3, "method": "list_tools"})["result"]) == 12)
 
 r = br.handle_message({"id": 4, "method": "call_tool",
                        "params": {"name": "get_scene_hierarchy",
@@ -393,6 +394,168 @@ r = call("get_viewport_screenshot")
 check("ฉากไม่มีกล้อง → บอกว่าต้องมีกล้องก่อน",
       r["ok"] is False and "ไม่มีกล้อง" in r["error"], str(r["error"])[:160])
 check("ข้อความแนะนำวิธีสร้างกล้อง", "camera_add" in r["error"], str(r["error"])[:200])
+
+# ===========================================================================
+section("[10] คลังฟรี Poly Haven (CC0 · ไม่ต้องใช้คีย์)")
+# ===========================================================================
+import tempfile as _tf  # noqa: E402
+
+CALLED: list[str] = []
+DOWNLOADED: list[tuple[str, str]] = []
+
+FAKE_MODELS = {
+    "Chair_A": {"name": "Chair A", "categories": ["furniture"], "tags": ["wood", "chair"],
+                "authors": {"Jane D": "All"}, "polycount": 1000, "max_resolution": [4096, 4096]},
+    "Barrel_B": {"name": "Barrel B", "categories": ["props"], "tags": ["metal", "barrel"],
+                 "authors": {"Som C": "All"}, "polycount": 300},
+    "Tree_C": {"name": "Tree C", "categories": ["nature"], "tags": ["tree", "leafy"],
+               "authors": {"Ann E": "All"}, "polycount": 5000},
+}
+
+
+def fake_json(url, timeout=30.0):  # noqa: ARG001
+    CALLED.append(url)
+    if url.endswith("/assets?t=models"):
+        return FAKE_MODELS
+    if url.endswith("/assets?t=hdris"):
+        return {"sky_1": {"name": "Sky One", "categories": ["outdoor"], "tags": ["sky"],
+                          "authors": {"Sky Author": "All"}, "max_resolution": [8192, 4096]}}
+    if url.endswith("/info/Chair_A"):
+        return {"name": "Chair A", "categories": ["furniture"], "authors": {"Jane D": "All"},
+                "polycount": 1000, "dimensions": [0.8, 0.8, 1.0]}
+    if url.endswith("/files/Chair_A"):
+        return {"gltf": {"1k": {"gltf": {"url": "https://dl.example/Chair_A.gltf", "size": 1000,
+                                         "include": {"textures/chair_diffuse.jpg":
+                                                     {"url": "https://dl.example/cd.jpg", "size": 10}}}}},
+                "Diffuse": {"1k": {"jpg": {"url": "https://dl.example/chair_d.jpg", "size": 20,
+                                           "include": {"textures/d.jpg":
+                                                       {"url": "https://dl.example/d.jpg", "size": 5}}}}},
+                "blend": {"1k": {"blend": {"url": "https://dl.example/x.blend", "size": 900,
+                                           "include": {}}}}}
+    if url.endswith("/files/sky_1"):
+        return {"hdri": {"1k": {"hdr": {"url": "https://dl.example/sky_1_1k.hdr",
+                                        "size": 500, "md5": "abc"},
+                                 "exr": {"url": "https://dl.example/sky_1_1k.exr",
+                                         "size": 900, "md5": "def"}},
+                         "16k": {"hdr": {"url": "https://dl.example/sky_16k.hdr",
+                                         "size": 377_000_000, "md5": "ghi"}}}}
+    raise AssertionError("เครื่องมือเรียก URL ที่ไม่คาดคิด: " + url)
+
+
+def fake_download(url, dest, max_bytes):
+    if max_bytes < 100:
+        raise br.ToolError("ไฟล์ใหญ่ 999 MB เกินเพดาน 0 MB")
+    if dest.is_file():
+        return dest.stat().st_size, False          # แคช
+    DOWNLOADED.append((url, str(dest)))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(b"x" * 20)
+    return 20, True
+
+
+_REAL_HTTP_JSON, _REAL_HTTP_DL = br._http_json, br._http_download   # เก็บของจริงไว้
+br._http_json = fake_json
+br._http_download = fake_download
+br._PH_LIST_CACHE.clear()
+fake_bpy.reset()
+
+r = ok("search_polyhaven", query="chair")
+check("ค้นเจอเฉพาะที่ตรงคำ", [a["id"] for a in r["assets"]] == ["Chair_A"], str(r["assets"]))
+check("ค้นแบบไม่สนตัวพิมพ์ใหญ่เล็ก",
+      [a["id"] for a in ok("search_polyhaven", query="CHAIR")["assets"]] == ["Chair_A"])
+check("ค้นเจอจาก tag ได้ด้วย",
+      [a["id"] for a in ok("search_polyhaven", query="leafy")["assets"]] == ["Tree_C"])
+check("บอกจำนวนที่ตรงทั้งหมด", r["total_matching"] == 1, str(r["total_matching"]))
+check("บอกสัญญาอนุญาต CC0 ชัดเจน", "CC0" in r["licence"], r["licence"])
+
+r = ok("search_polyhaven")
+check("ไม่ใส่คำค้น → ได้ทั้งหมด", r["total_matching"] == 3, str(r["total_matching"]))
+check("เรียงชิ้นที่โพลีน้อยก่อน (ไฟล์เบาก่อน)",
+      [a["id"] for a in r["assets"]][:2] == ["Barrel_B", "Chair_A"],
+      str([a["id"] for a in r["assets"]]))
+check("limit ทำงาน", len(ok("search_polyhaven", limit=2)["assets"]) == 2)
+check("กรองตามหมวดได้",
+      [a["id"] for a in ok("search_polyhaven", categories="nature")["assets"]] == ["Tree_C"])
+check("ค้นชนิดอื่นได้ (hdris)", ok("search_polyhaven", asset_type="hdris")["asset_type"] == "hdris")
+r = call("search_polyhaven", asset_type="ไม่รู้จัก")
+check("ชนิดที่ไม่รู้จัก → ปฏิเสธพร้อมบอกค่าที่ใช้ได้",
+      r["ok"] is False and "hdris" in r["error"], str(r["error"])[:140])
+check("แคชรายการไว้ (เรียก /assets?t=models ครั้งเดียวเท่านั้น)",
+      sum(1 for u in CALLED if u.endswith("/assets?t=models")) == 1,
+      str([u for u in CALLED if "assets" in u]))
+
+r = ok("get_polyhaven_info", asset_id="Chair_A")
+check("info: บอกชื่อ/หมวด/ผู้สร้าง", r["name"] == "Chair A" and r["authors"] == ["Jane D"],
+      str(r)[:120])
+check("info: บอกจำนวนโพลีโกนและขนาด", r["polycount"] == 1000 and r["dimensions"] is not None)
+check("info: บอกความละเอียดที่มีให้เลือก", "1k" in r["available"]["gltf"],
+      str(list(r["available"]["gltf"])))
+check("info: บอกรูปแบบทั้งหมดที่มี", {"gltf", "blend", "Diffuse"} <= set(r["available"]),
+      str(list(r["available"])))
+check("info: บอกขนาดไฟล์ให้ตัดสินใจได้ (ไม่ต้องดาวน์โหลดก่อน)",
+      r["available"]["gltf"]["1k"].get("gltf") == 1000, str(r["available"]["gltf"]))
+
+with _tf.TemporaryDirectory() as td:
+    DOWNLOADED.clear()
+    r = ok("download_polyhaven_asset", asset_id="Chair_A", kind="gltf", resolution="1k",
+           target_dir=td, apply=True)
+    check("ดาวน์โหลดไฟล์หลัก", any("Chair_A.gltf" in u for u, _ in DOWNLOADED), str(DOWNLOADED))
+    check("⚠️ ดึงไฟล์เท็กซ์เจอร์ที่ต้องใช้คู่กันด้วย (include)",
+          any("cd.jpg" in u for u, _ in DOWNLOADED), str(DOWNLOADED))
+    check("วางไฟล์เท็กซ์เจอร์ตามพาธสัมพัทธ์เดิม (ให้โมเดลอ้างถึงได้)",
+          pathlib.Path(td, "textures", "chair_diffuse.jpg").is_file(),
+          str(sorted(str(x) for x in pathlib.Path(td).rglob("*"))))
+    check("นำเข้าโมเดลเข้าฉากจริง + บอกชื่อวัตถุใหม่",
+          r["applied"] == "imported" and r["object_count"] == 2, str(r)[:160])
+    check("บอกสัญญาอนุญาต CC0", "CC0" in r["licence"])
+    check("เรียกซ้ำใช้แคช (ไม่ดาวน์โหลดซ้ำ)",
+          ok("download_polyhaven_asset", asset_id="Chair_A", kind="gltf",
+             target_dir=td)["reused_from_cache"] >= 1)
+
+    DOWNLOADED.clear()
+    r = ok("download_polyhaven_asset", asset_id="Chair_A", kind="Diffuse", resolution="1k",
+           target_dir=td, apply=True, texture_map="diffuse")
+    check("เท็กซ์เจอร์ → สร้างวัสดุและผูก Base Color",
+          r["applied"] == "material" and r["material"].startswith("PH_Chair_A"), str(r)[:160])
+    check("เลือกแผนที่ตามชื่อที่สั่ง", "d.jpg" in r["map_used"], r["map_used"])
+    mat = fake_bpy.DATA.materials[r["material"]]
+    check("เชื่อมโหนดรูปเข้ากับ Base Color จริง (1 เส้น)",
+          len(mat.node_tree.links.connections) == 1, str(mat.node_tree.links.connections))
+
+    r = ok("download_polyhaven_asset", asset_id="sky_1", kind="hdri", resolution="1k",
+           target_dir=td, apply=True)
+    check("HDRI → ตั้งเป็น world ให้ฉาก", r["applied"] == "world", str(r)[:150])
+    check("เลือก .hdr เป็นปริยาย (ไฟล์เล็กกว่า exr)", r["main_file"].endswith(".hdr"), r["main_file"])
+    world = fake_bpy.DATA.scenes[0].world
+    check("world เปิด use_nodes และต่อ Environment Texture → Background",
+          world.use_nodes and len(world.node_tree.links.connections) == 1,
+          str(world.node_tree.links.connections))
+
+    r = call("download_polyhaven_asset", asset_id="sky_1", kind="hdri", resolution="16k",
+             target_dir=td, max_mb=10)
+    check("ความละเอียดใหญ่เกินเพดาน → ปฏิเสธพร้อมบอกขนาดจริง (377 MB)",
+          r["ok"] is False and "377" in r["error"], str(r["error"])[:160])
+
+    r = call("download_polyhaven_asset", asset_id="Chair_A", kind="fbx", target_dir=td)
+    check("kind ที่ asset ไม่มี → บอกว่ามีอะไรให้เลือก",
+          r["ok"] is False and "gltf" in r["error"], str(r["error"])[:160])
+
+r = call("download_polyhaven_asset", asset_id="", kind="gltf")
+check("ไม่ระบุ asset_id → ปฏิเสธ", r["ok"] is False and "asset_id" in r["error"], str(r)[:120])
+
+section("[11] ทดสอบกับ Poly Haven จริง (ข้ามอัตโนมัติถ้าเครือข่ายไม่พร้อม)")
+# คืนฟังก์ชันเครือข่ายตัวจริงกลับก่อน (section [10] จำลองไว้)
+br._http_json, br._http_download = _REAL_HTTP_JSON, _REAL_HTTP_DL
+br._PH_LIST_CACHE.clear()
+try:
+    real = br._http_json(f"{br.POLYHAVEN_API}/types")
+    check("เข้าถึง API จริงได้", "models" in (real or []), str(real)[:120])
+    live = ok("search_polyhaven", query="chair", asset_type="models", limit=3)
+    check("ค้นของจริงได้ผล", live["total_matching"] > 10, str(live["total_matching"]))
+    check("ของจริงมีข้อมูลหมวดติดมาด้วย",
+          bool(live["assets"][0].get("categories")), str(live["assets"][0])[:140])
+except br.ToolError as exc:
+    print(f"    ⏭️  ข้ามการทดสอบออนไลน์: {str(exc)[:110]}")
 
 print()
 print("=" * 70)

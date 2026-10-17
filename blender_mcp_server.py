@@ -703,6 +703,41 @@ def register_tools(srv: MCPServer, rt: Runtime) -> None:
         return blocks
 
     @srv.tool()
+    async def search_polyhaven(query: str = "", asset_type: str = "models",
+                               categories: str = "", limit: int = 20) -> dict:
+        """Search Poly Haven, a library of CC0 (public domain — no API key, free for
+        any use) HDRIs, PBR textures and 3D models. Use it instead of modelling
+        everything by hand: an outdoor HDRI for lighting, a wood/metal texture, or a
+        ready-made prop (chair, barrel, tree, …). asset_type is hdris | textures |
+        models. Returns ids for get_polyhaven_info / download_polyhaven_asset."""
+        return await _run(lambda: rt.call("search_polyhaven", query=query,
+                                          asset_type=asset_type, categories=categories,
+                                          limit=limit))
+
+    @srv.tool()
+    async def get_polyhaven_info(asset_id: str) -> dict:
+        """List what is inside one Poly Haven asset before downloading: formats
+        (gltf/fbx/blend/usd for models, hdr/exr for HDRIs, map types for textures),
+        resolutions, file sizes, author and polycount. Check this to avoid pulling a
+        multi-hundred-MB 8k file."""
+        return await _run(lambda: rt.call("get_polyhaven_info", asset_id=asset_id))
+
+    @srv.tool()
+    async def download_polyhaven_asset(asset_id: str, kind: str = "gltf",
+                                       resolution: str = "1k", apply: bool = True,
+                                       target_dir: str = "", max_mb: float = 200.0,
+                                       texture_map: str = "") -> dict:
+        """Download a Poly Haven asset plus the texture files it needs, then bring it
+        into the scene: kind='hdri' sets it as the world lighting, kind='gltf' imports
+        the model, a texture map name (e.g. 'Diffuse') builds a material from it.
+        Files are cached locally so a second call is instant. Prefer resolution '1k'
+        or '2k' — 4k and above are hundreds of MB. Everything is CC0."""
+        return await _run(lambda: rt.call("download_polyhaven_asset", asset_id=asset_id,
+                                          kind=kind, resolution=resolution, apply=apply,
+                                          target_dir=target_dir, max_mb=max_mb,
+                                          texture_map=texture_map))
+
+    @srv.tool()
     async def execute_blender_script(code: str, allow_unsafe: bool = False,
                                      return_variables: str = "result") -> dict:
         """Run raw bpy Python inside Blender and return stdout, the value of the

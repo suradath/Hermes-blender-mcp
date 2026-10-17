@@ -250,7 +250,7 @@ with mock.patch.object(srv, "find_blender", return_value=(None, "หาไม่
                       str(srv._blender_config_root()))
             with mock.patch.object(srv.platform, "system", return_value="Windows"), \
                     mock.patch.dict(os.environ, {"APPDATA": "C:/Users/x/AppData/Roaming"}, clear=True):
-                check("Windows → ใช้ %APPDATA%\Blender Foundation",
+                check(r"Windows → ใช้ %APPDATA%\Blender Foundation",
                       "Blender Foundation" in str(srv._blender_config_root()),
                       str(srv._blender_config_root()))
 

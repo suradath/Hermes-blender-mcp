@@ -186,8 +186,9 @@ async def main() -> int:
                               "modify_object_transform", "execute_blender_script",
                               "get_object_details", "delete_object",
                               "set_object_material", "save_blend_file",
-                              "get_viewport_screenshot"]
-                    check("มีเครื่องมือครบ 9 ตัว", len(names) == 9, str(names))
+                              "get_viewport_screenshot", "search_polyhaven",
+                              "get_polyhaven_info", "download_polyhaven_asset"]
+                    check("มีเครื่องมือครบ 12 ตัว", len(names) == 12, str(names))
                     for want in expect:
                         check(f"มีเครื่องมือ {want}", want in names, str(names))
 

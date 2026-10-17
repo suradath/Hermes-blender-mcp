@@ -82,6 +82,10 @@ class FakeTypedCollection(FakeCollection):
     def new(self, name, *args, **kwargs):  # noqa: ARG002
         return self.add(self.item_class(_unique_in(self, name)))
 
+    def load(self, filepath):
+        """``bpy.data.images.load(path)`` — ของจริงสร้าง image data-block จากไฟล์"""
+        return self.add(self.item_class(pathlib.Path(filepath).name))
+
 
 def _unique_in(collection, base: str) -> str:
     if base not in collection:
@@ -99,22 +103,52 @@ class FakeNodeInput:
 
 
 class FakeNode:
-    def __init__(self, name="Principled BSDF", ntype="BSDF_PRINCIPLED"):
+    """โหนดทั่วไป (Environment Texture / Image Texture / Background)"""
+
+    def __init__(self, name="Node", ntype="SHADER_NODE", inputs=None):
         self.name, self.type = name, ntype
-        self.inputs = {
-            "Base Color": FakeNodeInput((0.8, 0.8, 0.8, 1.0)),
-            "Metallic": FakeNodeInput(0.0),
-            "Roughness": FakeNodeInput(0.5),
-            "Alpha": FakeNodeInput(1.0),
-        }
+        self.image = None
+        self.inputs = inputs if inputs is not None else {"Color": FakeNodeInput(None)}
+        self.outputs = {"Color": FakeNodeInput(None)}
+
+
+class FakeNodeCollection(FakeCollection):
+    """``node_tree.nodes`` ของจริงมี .new(type) ให้สร้างโหนด"""
+
+    def new(self, ntype, *args, **kwargs):  # noqa: ARG002
+        return self.add(FakeNode(str(ntype), str(ntype)))
+
+    def remove(self, node, do_unlink=True):  # noqa: ARG002
+        self.pop(getattr(node, "name", node), None)
 
 
 class FakeNodeTree:
     def __init__(self):
-        self.nodes = {"Principled BSDF": FakeNode()}
+        self.nodes = FakeNodeCollection()
+        self.nodes.add(FakeNode("Principled BSDF", "BSDF_PRINCIPLED", inputs={
+            "Base Color": FakeNodeInput((0.8, 0.8, 0.8, 1.0)),
+            "Metallic": FakeNodeInput(0.0),
+            "Roughness": FakeNodeInput(0.5),
+            "Alpha": FakeNodeInput(1.0),
+        }))
+        self.links = FakeLinks()
 
     def get(self, name):
         return self.nodes.get(name)
+
+    def new(self, ntype):
+        return self.nodes.new(ntype)
+
+
+class FakeLinks:
+    """เลียนแบบ node_tree.links — บันทึกการเชื่อมเพื่อให้เทสต์ตรวจได้"""
+
+    def __init__(self):
+        self.connections: list[tuple] = []
+
+    def new(self, output_socket, input_socket):
+        self.connections.append((output_socket, input_socket))
+        return True
 
 
 class FakeMaterial(_Named):
@@ -200,6 +234,27 @@ class FakeModifier:
 
 
 # ------------------------------------------------------------------ คอลเลกชันฉาก
+class _ChildList(list):
+    """``collection.children`` ของจริงมี .link()/.unlink() และตั้ง .parent ให้ด้วย"""
+
+    def __init__(self, owner):
+        super().__init__()
+        self.owner = owner
+
+    def link(self, coll):
+        if coll not in self:
+            self.append(coll)
+        coll.parent = self.owner
+        return None
+
+    def unlink(self, coll):
+        if coll in self:
+            self.remove(coll)
+        if getattr(coll, "parent", None) is self.owner:
+            coll.parent = None
+        return None
+
+
 class _ObjectList(list):
     """``collection.objects`` ของจริงมี .link()/.unlink() อยู่ในตัว"""
 
@@ -219,7 +274,7 @@ class FakeSceneCollection:
         self.name = name
         self.parent = parent
         self.objects = _ObjectList(self)
-        self.children = []
+        self.children = _ChildList(self)
         self.hide_viewport = False
 
     def link(self, obj):
@@ -241,6 +296,21 @@ class FakeSceneCollection:
         return f"<FakeSceneCollection {self.name}>"
 
 
+class FakeWorld:
+    def __init__(self, name="World"):
+        self.name = name
+        self.use_nodes = False
+        self.node_tree = FakeNodeTree()
+
+    def __repr__(self):
+        return f"<FakeWorld {self.name}>"
+
+
+class FakeImage:
+    def __init__(self, name):
+        self.name = name
+
+
 class FakeScene:
     def __init__(self, name="Scene"):
         self.name = name
@@ -254,7 +324,7 @@ class FakeScene:
             "filepath": "",
             "image_settings": type("I", (), {"file_format": "PNG"})(),
         })()
-        self.world = type("W", (), {"name": "World"})()
+        self.world = FakeWorld("World")
         self.collection = FakeSceneCollection("Scene Collection")
         self.camera = None          # ของจริงตั้งกล้องให้ฉากเริ่มต้น — reset() จะตั้งให้
 
@@ -275,6 +345,7 @@ class FakeOps:
         self._mesh = _FakeMeshOps(self)
         self._wm = _FakeWmOps(self)
         self._render = _FakeRenderOps(self)
+        self._import_scene = _FakeImportOps(self)
 
     # bpy.ops.mesh.*
     @property
@@ -290,6 +361,11 @@ class FakeOps:
     @property
     def render(self):
         return self._render
+
+    # bpy.ops.import_scene.*
+    @property
+    def import_scene(self):
+        return self._import_scene
 
 
 _MESH_IDENTIFIERS = {
@@ -371,6 +447,40 @@ class _FakeRenderOps:
             # ของจริง: opengl render ใช้ไม่ได้ในโหมด -b (ไม่มี OpenGL context)
             raise RuntimeError("OpenGL render is not available in background mode")
         return self._write("opengl", write_still)
+
+
+class _FakeImportOps:
+    """bpy.ops.import_scene.* — ตัวนำเข้าโมเดล (gltf/fbx/obj/usd)"""
+
+    def __init__(self, ops: FakeOps):
+        self._ops = ops
+        self.missing = ()            # ตั้งชื่อ operator ที่อยากจำลองว่า "ไม่มี"
+
+    def _import(self, op_name: str, filepath: str, objects: int = 2):
+        self._ops.calls.append((f"import_scene.{op_name}", {"filepath": filepath}))
+        if op_name in self.missing:
+            raise RuntimeError(f"add-on '{op_name}' is not enabled")
+        made = []
+        for i in range(objects):
+            time_ = pathlib.Path(filepath).stem
+            obj = FakeObject(_unique_name(f"{time_}_{i + 1}" if objects > 1 else time_))
+            DATA.objects.add(obj)
+            DATA.scenes[0].collection.objects.append(obj)
+            obj.users_collection = [DATA.scenes[0].collection]
+            made.append(obj.name)
+        return made
+
+    def gltf(self, filepath="", **kwargs):  # noqa: ARG002
+        return self._import("gltf", filepath)
+
+    def fbx(self, filepath="", **kwargs):  # noqa: ARG002
+        return self._import("fbx", filepath)
+
+    def obj(self, filepath="", **kwargs):  # noqa: ARG002
+        return self._import("obj", filepath, objects=1)
+
+    def usd(self, filepath="", **kwargs):  # noqa: ARG002
+        return self._import("usd", filepath, objects=1)
 
 
 class _FakeWmOps:
@@ -456,9 +566,11 @@ class FakeData:
         self.objects = FakeCollection()
         self.meshes = FakeTypedCollection(FakeMesh)
         self.materials = FakeTypedCollection(FakeMaterial)
-        self.collections = FakeCollection()
+        self.collections = FakeTypedCollection(FakeSceneCollection)
         self.cameras = FakeTypedCollection(FakeCamera)
         self.lights = FakeTypedCollection(FakeLight)
+        self.worlds = FakeTypedCollection(FakeWorld)
+        self.images = FakeTypedCollection(FakeImage)
         self.scenes = [FakeScene()]
         self.filepath = ""
         self.is_dirty = False

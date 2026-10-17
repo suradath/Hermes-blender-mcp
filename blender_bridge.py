@@ -622,6 +622,299 @@ def get_viewport_screenshot(filepath: str = "", width: int = 0, height: int = 0,
 
 
 # ===========================================================================
+#  คลังของฟรีจาก Poly Haven (CC0 — ไม่ต้องใช้คีย์)  ใช้แค่ stdlib
+# ===========================================================================
+
+POLYHAVEN_API = "https://api.polyhaven.com"
+# ⚠️ User-Agent ต้องเป็น ASCII เท่านั้น — HTTP header เข้ารหัสเป็น latin-1
+# (เคยใส่ชื่อไทยตรงนี้แล้ว urllib โยน UnicodeEncodeError — เทสต์ออนไลน์จับได้)
+POLYHAVEN_UA = "blender-mcp-lpm/1.0 (LPM school project; +https://polyhaven.com)"
+POLYHAVEN_TYPES = ("hdris", "textures", "models")
+_PH_LIST_CACHE: dict[str, dict] = {}
+
+
+def _blender_can_import(operator: str) -> bool:
+    """Blender รุ่นนี้มีตัวนำเข้าไฟล์ชนิดนั้นไหม (เช่น gltf อาจถูกปิด)"""
+    try:
+        mod, op = operator.split(".")
+        return hasattr(getattr(bpy.ops, mod, None) or object(), op)
+    except Exception:
+        return False
+
+
+def _http_json(url: str, timeout: float = 30.0):
+    """อ่าน JSON จาก Poly Haven — ที่เดียวในโปรเจกต์ที่แตะเครือข่าย"""
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(url, headers={"User-Agent": POLYHAVEN_UA})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            raw = resp.read()
+    except urllib.error.HTTPError as exc:
+        raise ToolError(f"Poly Haven ตอบกลับผิดพลาด HTTP {exc.code} — ลองใหม่ภายหลัง") from exc
+    except Exception as exc:  # noqa: BLE001
+        raise ToolError(f"ต่อ Poly Haven ไม่ได้ ({type(exc).__name__}: {exc}) — "
+                        f"ตรวจอินเทอร์เน็ต/ไฟร์วอลล์ หรือลองใหม่") from exc
+    text = raw.decode("utf-8", errors="replace").lstrip()
+    if not text[:1] in ("[", "{"):
+        # Poly Haven กัน IP ของศูนย์ข้อมูลด้วยหน้า challenge (HTML) — ต้องบอกให้เข้าใจ
+        raise ToolError("Poly Haven ตอบกลับไม่ใช่ JSON (อาจเป็นหน้า challenge ของศูนย์ข้อมูล) "
+                        "— เครือข่ายนี้เข้าไม่ถึง คลังนี้")
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ToolError(f"อ่านข้อมูลจาก Poly Haven ไม่ได้: {exc}") from exc
+
+
+def _http_download(url: str, dest: pathlib.Path, max_bytes: int) -> tuple[int, bool]:
+    """ดาวน์โหลดไฟล์ (ข้ามถ้ามีอยู่แล้วครบ) คืน (ขนาดไบต์, ดึงใหม่ไหม)"""
+    import urllib.error
+    import urllib.request
+
+    if dest.is_file() and dest.stat().st_size > 0:
+        return dest.stat().st_size, False
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    req = urllib.request.Request(url, headers={"User-Agent": POLYHAVEN_UA})
+    tmp = dest.with_name(dest.name + ".part")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
+            declared = int(resp.headers.get("Content-Length") or 0)
+            if declared and declared > max_bytes:
+                raise ToolError(
+                    f"ไฟล์ใหญ่ {declared / 1e6:.0f} MB เกินเพดาน {max_bytes / 1e6:.0f} MB "
+                    f"— เลือกความละเอียดต่ำลง หรือเพิ่ม max_mb")
+            got = 0
+            with tmp.open("wb") as fh:
+                while True:
+                    chunk = resp.read(1 << 16)
+                    if not chunk:
+                        break
+                    got += len(chunk)
+                    if got > max_bytes:
+                        raise ToolError(f"ไฟล์ใหญ่เกินเพดาน {max_bytes / 1e6:.0f} MB — ยกเลิกกลางทาง")
+                    fh.write(chunk)
+    except ToolError:
+        tmp.unlink(missing_ok=True)
+        raise
+    except urllib.error.HTTPError as exc:
+        tmp.unlink(missing_ok=True)
+        raise ToolError(f"ดาวน์โหลดไม่สำเร็จ HTTP {exc.code}: {url}") from exc
+    except Exception as exc:  # noqa: BLE001
+        tmp.unlink(missing_ok=True)
+        raise ToolError(f"ดาวน์โหลดไม่สำเร็จ ({type(exc).__name__}: {exc})") from exc
+    tmp.replace(dest)
+    return dest.stat().st_size, True
+
+
+def _ph_list(asset_type: str) -> dict:
+    """รายการ asset ทั้งหมดของชนิดนั้น (แคชไว้ในหน่วยความจำต่อการรันหนึ่งครั้ง)"""
+    if asset_type not in POLYHAVEN_TYPES:
+        raise ToolArgumentError(f"asset_type '{asset_type}' ไม่ถูกต้อง — "
+                                f"ใช้ {' | '.join(POLYHAVEN_TYPES)}")
+    if asset_type not in _PH_LIST_CACHE:
+        _PH_LIST_CACHE[asset_type] = _http_json(f"{POLYHAVEN_API}/assets?t={asset_type}")
+    return _PH_LIST_CACHE[asset_type]
+
+
+@tool(
+    "search_polyhaven",
+    "Search Poly Haven — a library of CC0 (public domain, no API key, free for any "
+    "use) HDRIs, PBR textures and 3D models. Call this to find real-world assets "
+    "instead of modelling everything by hand: e.g. an outdoor HDRI for lighting, a "
+    "wood/metal texture, or a ready-made prop like a chair or barrel. Returns ids "
+    "you then pass to get_polyhaven_info / download_polyhaven_asset.",
+)
+def search_polyhaven(query: str = "", asset_type: str = "models", categories: str = "",
+                     limit: int = 20) -> dict:
+    items = _ph_list(asset_type)
+    q = (query or "").strip().lower()
+    cats = [c.strip().lower() for c in (categories or "").split(",") if c.strip()]
+
+    out = []
+    for aid, meta in items.items():
+        haystack = " ".join([aid, meta.get("name", ""), " ".join(meta.get("tags") or []),
+                             " ".join(meta.get("categories") or [])]).lower()
+        if q and q not in haystack:
+            continue
+        if cats and not all(c in [x.lower() for x in (meta.get("categories") or [])] for c in cats):
+            continue
+        out.append({"id": aid, "name": meta.get("name", aid),
+                    "categories": meta.get("categories") or [],
+                    "tags": (meta.get("tags") or [])[:8],
+                    "authors": list((meta.get("authors") or {}).keys()),
+                    "polycount": meta.get("polycount"),
+                    "max_resolution": meta.get("max_resolution")})
+    out.sort(key=lambda a: (a["polycount"] is None, a["polycount"] or 0))
+    return {"asset_type": asset_type, "total_matching": len(out), "returned": min(limit, len(out)),
+            "assets": out[:max(1, int(limit))],
+            "licence": "CC0 (public domain) — ใช้ฟรี ไม่ต้องอ้างอิงที่มา (แต่ให้เครดิตก็ดี)",
+            "next": "เรียก get_polyhaven_info(asset_id) เพื่อดูความละเอียด/รูปแบบที่มี"}
+
+
+@tool(
+    "get_polyhaven_info",
+    "Show what is inside one Poly Haven asset before downloading it: available "
+    "formats (gltf/fbx/blend/usd for models; hdr/exr for HDRIs; map types for "
+    "textures), resolutions, sizes and the author. Use this to pick a resolution "
+    "that is not huge.",
+)
+def get_polyhaven_info(asset_id: str) -> dict:
+    if not asset_id:
+        raise ToolArgumentError("ต้องระบุ asset_id (ดูได้จาก search_polyhaven)")
+    info = _http_json(f"{POLYHAVEN_API}/info/{asset_id}")
+    files = _http_json(f"{POLYHAVEN_API}/files/{asset_id}")
+
+    available = {}
+    for kind, per_res in (files or {}).items():
+        if not isinstance(per_res, dict):
+            continue
+        sizes = {}
+        for res, entry in per_res.items():
+            if not isinstance(entry, dict):
+                continue
+            if "url" in entry:                      # HDRI: {"1k": {"hdr": {url,...}}}
+                sizes[res] = {k: v.get("size") for k, v in entry.items() if isinstance(v, dict)}
+            else:                                   # โมเดล/เท็กซ์เจอร์: {"1k": {"gltf": {...}}}
+                for fmt, det in entry.items():
+                    if isinstance(det, dict):
+                        sizes.setdefault(res, {})[fmt] = det.get("size")
+        available[kind] = sizes
+    return {"id": asset_id, "name": info.get("name", asset_id),
+            "categories": info.get("categories"), "tags": (info.get("tags") or [])[:10],
+            "authors": list((info.get("authors") or {}).keys()),
+            "dimensions": info.get("dimensions"), "polycount": info.get("polycount"),
+            "max_resolution": info.get("max_resolution"),
+            "available": available,
+            "licence": "CC0 — Poly Haven ให้ใช้ฟรีทุกวัตถุประสงค์"}
+
+
+@tool(
+    "download_polyhaven_asset",
+    "Download one Poly Haven asset (plus the texture files it needs) into the local "
+    "cache and optionally bring it into the scene: kind='hdri' applies it as the "
+    "world lighting, kind='gltf' imports the model, kind='texture' builds a material "
+    "from the base-colour map. Everything is CC0. Prefer resolution '1k' or '2k' — "
+    "4k/8k/16k files are hundreds of MB.",
+)
+def download_polyhaven_asset(asset_id: str, kind: str = "gltf", resolution: str = "1k",
+                             apply: bool = True, target_dir: str = "",
+                             max_mb: float = 200.0, texture_map: str = "") -> dict:
+    if not asset_id:
+        raise ToolArgumentError("ต้องระบุ asset_id")
+    files = _http_json(f"{POLYHAVEN_API}/files/{asset_id}")
+    if not isinstance(files, dict) or not files:
+        raise ToolError(f"ไม่พบไฟล์ของ '{asset_id}'")
+
+    cache = pathlib.Path(target_dir) if target_dir else (
+        pathlib.Path(tempfile.gettempdir()) / "blender-mcp" / "polyhaven" /
+        f"{asset_id}_{resolution}")
+    max_bytes = int(float(max_mb) * 1_000_000)
+
+    # ---- เลือกไฟล์หลัก + ไฟล์ประกอบ ----
+    main_url = main_path = None
+    include: dict = {}
+    if kind == "hdri":
+        if "hdri" not in files:
+            raise ToolArgumentError(f"'{asset_id}' ไม่ใช่ HDRI (มี: {', '.join(files)})")
+        per_res = files["hdri"]
+        sizes = per_res.get(resolution) or per_res.get("1k") or next(iter(per_res.values()))
+        fmt = "hdr" if "hdr" in sizes else next(iter(sizes))
+        entry = sizes[fmt]
+        main_url, main_path, declared = entry.get("url"), f"{asset_id}_{resolution}.{fmt}", entry.get("size")
+    else:
+        block = files.get(kind)
+        if not isinstance(block, dict):
+            raise ToolArgumentError(
+                f"'{asset_id}' ไม่มีรูปแบบ '{kind}' (มี: {', '.join(files)})\n"
+                f"สำหรับโมเดลให้ใช้ kind='gltf' (หรือ fbx/blend/usd) · "
+                f"สำหรับเท็กซ์เจอร์ให้ใช้ชื่อแผนที่ เช่น kind='Diffuse'")
+        per_res = block
+        sizes = per_res.get(resolution) or per_res.get("1k") or next(iter(per_res.values()))
+        fmt = next(iter(sizes))
+        entry = sizes[fmt]
+        main_url = entry.get("url")
+        declared = entry.get("size")
+        main_path = pathlib.Path(main_url).name if main_url else None
+        include = entry.get("include") or {}
+
+    if not main_url:
+        raise ToolError(f"ไม่พบที่อยู่ไฟล์ของ '{asset_id}' ({kind} {resolution})")
+    if declared and declared > max_bytes:
+        raise ToolError(f"ไฟล์ความละเอียด {resolution} ใหญ่ {declared / 1e6:.0f} MB "
+                        f"เกินเพดาน {max_mb:.0f} MB — เลือกความละเอียดต่ำลงหรือเพิ่ม max_mb")
+
+    downloaded, reused, total = [], 0, 0
+    size, fresh = _http_download(main_url, cache / (main_path or "asset.bin"), max_bytes)
+    total += size
+    downloaded.append({"file": main_path, "bytes": size, "new": fresh})
+    reused += 0 if fresh else 1
+
+    for rel, det in include.items():                 # ไฟล์เท็กซ์เจอร์ที่ต้องมีคู่กัน
+        if not isinstance(det, dict) or not det.get("url"):
+            continue
+        dest = cache / rel
+        size, fresh = _http_download(det["url"], dest, max_bytes)
+        total += size
+        downloaded.append({"file": rel, "bytes": size, "new": fresh})
+        reused += 0 if fresh else 1
+
+    result = {"asset_id": asset_id, "kind": kind, "resolution": resolution,
+              "directory": str(cache), "files": downloaded,
+              "total_mb": round(total / 1e6, 2), "reused_from_cache": reused,
+              "main_file": str(cache / (main_path or "asset.bin")),
+              "licence": "CC0 (public domain)"}
+
+    if not apply:
+        result["note"] = "ยังไม่ได้ใส่เข้าฉาก (apply=False) — ไฟล์อยู่ในโฟลเดอร์ข้างบน"
+        return result
+
+    # ---- นำเข้าฉาก ----
+    if kind == "hdri":
+        image = bpy.data.images.load(str(cache / main_path))
+        world = getattr(_scene(), "world", None) or bpy.data.worlds.new("PolyHaven")
+        _scene().world = world
+        world.use_nodes = True
+        nodes = world.node_tree.nodes
+        bg = nodes.get("Background") or nodes.new("ShaderNodeBackground")
+        tex = nodes.new("ShaderNodeTexEnvironment")
+        tex.image = image
+        world.node_tree.links.new(bg.inputs["Color"], tex.outputs["Color"])
+        result.update({"applied": "world", "world": world.name, "image": image.name})
+    elif kind in ("gltf", "glb", "fbx", "obj", "usd"):
+        op = getattr(bpy.ops.import_scene, kind, None)
+        if op is None:
+            raise ToolError(f"Blender รุ่นนี้ไม่มีตัวนำเข้า '{kind}' — ลอง kind='gltf' "
+                            f"หรือติดตั้ง add-on ที่เกี่ยวข้อง")
+        before = {o.name for o in bpy.data.objects}
+        op(filepath=str(cache / main_path))
+        new_objs = [o.name for o in bpy.data.objects if o.name not in before]
+        result.update({"applied": "imported", "objects": new_objs,
+                       "object_count": len(new_objs)})
+    else:                                             # เท็กซ์เจอร์
+        images = [f for f in downloaded if str(f["file"]).lower().endswith(
+            (".jpg", ".jpeg", ".png", ".exr", ".hdr", ".tif", ".tiff"))]
+        if not images:
+            result["note"] = "ไม่พบไฟล์รูปในเท็กซ์เจอร์ชุดนี้"
+            return result
+        chosen = next((f for f in images if texture_map and texture_map.lower()
+                       in str(f["file"]).lower()), images[0])
+        image = bpy.data.images.load(str(cache / chosen["file"]))
+        mat = bpy.data.materials.new(f"PH_{asset_id}")
+        mat.use_nodes = True
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+        node = mat.node_tree.nodes.new("ShaderNodeTexImage")
+        node.image = image
+        if bsdf is not None:
+            mat.node_tree.links.new(bsdf.inputs["Base Color"], node.outputs["Color"])
+        result.update({"applied": "material", "material": mat.name, "image": image.name,
+                       "map_used": chosen["file"],
+                       "note": "ผูกเป็น Base Color ให้แล้ว — แผนที่อื่น (normal/roughness) "
+                               "นำไปต่อเองได้ด้วย execute_blender_script"})
+    return result
+
+
+# ===========================================================================
 #  เครื่องมือ 5 : execute_blender_script  (มีด่านตรวจ ไม่ใช่ sandbox!)
 # ===========================================================================
 

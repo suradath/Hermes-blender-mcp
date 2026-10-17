@@ -187,10 +187,10 @@ Successful output:
 
 ```
   Connecting to 'blender'...
-  ✓ Connected! Found 8 tool(s) from 'blender':
+  ✓ Connected! Found 12 tool(s) from 'blender':
     get_scene_hierarchy · add_primitive_mesh · modify_object_transform · …
-  Enable all 8 tools? [Y/n/select]: Y
-  ✓ Saved 'blender' to ~/.hermes/config.yaml (8/8 tools enabled)
+  Enable all 12 tools? [Y/n/select]: Y
+  ✓ Saved 'blender' to ~/.hermes/config.yaml (12/12 tools enabled)
 ```
 
 Confirm later with:
