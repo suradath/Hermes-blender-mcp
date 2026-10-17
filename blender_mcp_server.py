@@ -411,6 +411,12 @@ class BlenderProcess:
                 "--interval", str(self.args.interval)]
 
         log("เปิด Blender:", " ".join(cmd))
+        # กันความเข้าใจผิดที่เจอจริง: ผู้ใช้เปิด Blender หน้าต่างไว้เองแล้วคาดว่า
+        # ของจะไปโผล่ที่นั่น แต่เซิร์ฟเวอร์เปิด Blender ของตัวเองแบบไม่มีหน้าต่าง
+        if not self.args.gui and not self.args.attach:
+            log("โหมด headless: วัตถุจะไปอยู่ใน Blender ที่เซิร์ฟเวอร์เปิดเอง "
+                "(มองไม่เห็น) — ถ้าต้องการเห็นสดในหน้าต่าง ให้ใส่ --gui "
+                "หรือติด add-on แล้วใช้ --attach 127.0.0.1:9876 --token <token>")
         self.proc = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL, text=True, encoding="utf-8",
@@ -931,7 +937,10 @@ def _selftest(rt: Runtime, deep: bool = False) -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"❌ เปิด Blender ไม่ได้: {exc}")
         return 1
-    print(f"✅ ต่อได้ · Blender {rt.client.info.get('blender')}")
+    _cfg = rt.cfg                      # Runtime เก็บ argparse.Namespace ไว้ที่ .cfg
+    mode = "timer (มีหน้าต่าง — เห็นสด)" if _cfg.gui else (
+        "attach (ต่อกับ Blender ที่เปิดอยู่)" if _cfg.attach else "main (headless — มองไม่เห็น)")
+    print(f"✅ ต่อได้ · Blender {rt.client.info.get('blender')} · โหมด: {mode}")
     checks = [
         ("get_scene_hierarchy", {}),
         ("add_primitive_mesh", {"primitive": "cube", "name": "LPM_Test", "location": [1, 1, 1]}),
