@@ -443,7 +443,8 @@ Hermes-blender-mcp/
 │   ├── images/               ← รูปประกอบในคู่มือ (ภาพเทียบต้นแบบ/โมเดล/ผัง blockout)
 │   ├── 01-ติดตั้ง-Windows11.md
 │   ├── 02-Hermes-config.md
-│   └── 03-สร้างตัวละครจากรูป.md ← ตอบคำถาม "แนบรูปแล้วสร้างตามแบบได้ไหม"
+│   ├── 03-สร้างตัวละครจากรูป.md
+│   └── 04-GitHub-repo-setup.md ← ข้อความ Description/Topics พร้อมใช้ตอน publish ← ตอบคำถาม "แนบรูปแล้วสร้างตามแบบได้ไหม"
 ├── .github/workflows/tests.yml ← รันชุดทดสอบบน GitHub อัตโนมัติ
 ├── .gitattributes            ← บังคับ CRLF/LF ให้ .bat/.sh ไม่พังข้ามระบบ
 ├── tests/
