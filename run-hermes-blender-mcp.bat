@@ -1,4 +1,6 @@
 @echo off
+REM ไฟล์นี้เป็น UTF-8 (ไม่มี BOM) — ต้อง chcp 65001 ก่อนพิมพ์ภาษาไทย
+chcp 65001 >nul 2>&1
 REM ============================================================================
 REM  Hermes Blender MCP — ตัวเปิด MCP server (Windows 11)
 REM  ปกติ Hermes จะเรียกไฟล์นี้ให้เองตาม config.yaml — ไม่ต้องดับเบิลคลิก
@@ -15,8 +17,9 @@ if exist ".venv\Scripts\python.exe" (
     if exist ".venv\bin\python.exe" (
         set "PY=.venv\bin\python.exe"
     ) else (
-        echo [!] ยังไม่มี venv — กําลังใช้ python ของเครื่อง
-        echo     แนะนําให้รัน install-windows.bat ก่อน
+        echo [!] No venv found - using the system Python.
+        echo     Run install-windows.bat first (recommended).
+        echo [!] ยังไม่มี venv — กําลังใช้ python ของเครื่อง (แนะนําให้รัน install-windows.bat)
         set "PY=python"
     )
 )

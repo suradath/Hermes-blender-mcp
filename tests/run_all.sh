@@ -23,6 +23,7 @@ echo "======================================================================"
 
 declare -a NAMES=(
     "test_addon_structure.py"
+    "test_bat_encoding.py"
     "test_docs_links.py"
     "test_example_character.py"
     "test_mesh_lib.py"
