@@ -1,0 +1,14 @@
+# LPM Blender MCP — แพ็กเกจที่ต้องใช้ (เฉพาะ MCP server)
+#
+# ต้องใช้กับ Python ของ "เครื่อง" ไม่ใช่ Python ที่มากับ Blender
+# (Blender ไม่ต้องติดตั้งอะไรเลย — blender_bridge.py ใช้แค่ stdlib)
+#
+# ติดตั้ง:  python -m pip install -r requirements.txt
+#
+# ทดสอบแล้วกับ Python 3.12 / 3.14 และ mcp 2.3.0
+
+mcp>=2.0,<3          # MCP Python SDK (เวอร์ชัน 2.x เปลี่ยน FastMCP -> MCPServer)
+anyio>=4.0           # มากับ mcp อยู่แล้ว แต่ระบุไว้ให้ชัดว่ารายชื่อต้องมี
+
+# หมายเหตุ: mcp 2.x จะดึง starlette/uvicorn/httpx ให้ด้วยเพื่อรองรับ
+# transport แบบ HTTP/SSE — งานนี้ใช้แค่ stdio จึงไม่จำเป็นต้องใช้จริง

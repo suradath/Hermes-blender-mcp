@@ -1,0 +1,21 @@
+# virtual environment (ไม่ต้องเก็บ — สร้างใหม่ได้จาก requirements.txt)
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# บันทึกและไฟล์ชั่วคราว
+*.log
+/tmp-*
+.build/
+
+# ไฟล์งาน Blender (อย่าเผลอ commit งานของผู้ใช้)
+*.blend
+*.blend1
+*.blend2
+
+# ของ OS
+.DS_Store
+Thumbs.db
+desktop.ini
