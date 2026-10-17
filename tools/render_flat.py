@@ -34,7 +34,8 @@ def _rot_z(p, deg):
 def render(parts, out_path, width=560, height=780, view="front", rot_z=0.0, rot_x=0.0,
            light=(-0.42, -0.72, 0.55), ambient=0.34, background=(250, 250, 252),
            outline=(40, 40, 48), pad_frac=0.05, draw_outline=True,
-           shadow=False, gradient=False):
+           shadow=False, gradient=False, shadow_bbox=None,
+           no_outline_mats=()):
     """เรนเดอร์มุมมองด้านหน้า (มองจาก -Y) · ``rot_z`` > 0 = หมุนตัวเป็นมุม 3/4
 
     parts = [(ชื่อ, (verts, faces), วัสดุ), ...] โดยวัสดุ = {"name":…, "color":(r,g,b)}
@@ -88,7 +89,8 @@ def render(parts, out_path, width=560, height=780, view="front", rot_z=0.0, rot_
             k = ambient + (1 - ambient) * lam
             # สว่างน้อย = สีเข้มลง (ไม่ใช้ฟังก์ชันแกมมา เพื่อความง่ายและคาดเดาได้)
             fill = tuple(max(0, min(255, int(255 * c * k))) for c in col)
-            tris.append((depth, [to_screen(q) for q in rot_pts], fill))
+            tris.append((depth, [to_screen(q) for q in rot_pts], fill,
+                         mat.get("name") in no_outline_mats))
 
     tris.sort(key=lambda t: -t[0])                            # ไกลก่อน ใกล้ทับทีหลัง
     if gradient:                                              # พื้นหลังไล่สีอ่อน ๆ
@@ -103,24 +105,27 @@ def render(parts, out_path, width=560, height=780, view="front", rot_z=0.0, rot_
     else:
         img = Image.new("RGB", (width, height), background)
     d = ImageDraw.Draw(img)
-    if shadow:                                                # เงาสัมผัสใต้โมเดล (นุ่ม ๆ)
+    if shadow:                                                # เงาสัมผัส (ได้หลายวง)
         from PIL import ImageFilter
-        corners = [to_screen(xform((x, y, lo_z)))
-                   for x in (lo_x, hi_x) for y in (lo_y, hi_y)]
-        px_ = [c[0] for c in corners]
-        py_ = [c[1] for c in corners]
-        cx_ = (min(px_) + max(px_)) / 2.0
-        cy_ = (min(py_) + max(py_)) / 2.0
-        rx_ = max(6.0, (max(px_) - min(px_)) / 2.0 * 1.02)
-        ry_ = max(4.0, rx_ * 0.26)
+        boxes = shadow_bbox if isinstance(shadow_bbox, list) else \
+            [shadow_bbox or ((lo_x, lo_y, lo_z), (hi_x, hi_y, hi_z))]
         layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        ImageDraw.Draw(layer).ellipse([cx_ - rx_, cy_ - ry_, cx_ + rx_, cy_ + ry_],
-                                      fill=(28, 30, 36, 110))
+        ld = ImageDraw.Draw(layer)
+        for sb in boxes:
+            corners = [to_screen(xform((x, y, sb[0][2])))
+                       for x in (sb[0][0], sb[1][0]) for y in (sb[0][1], sb[1][1])]
+            px_ = [c[0] for c in corners]
+            py_ = [c[1] for c in corners]
+            cx_ = (min(px_) + max(px_)) / 2.0
+            cy_ = (min(py_) + max(py_)) / 2.0
+            rx_ = max(5.0, (max(px_) - min(px_)) / 2.0 * 0.90)
+            ry_ = max(3.0, rx_ * 0.26)
+            ld.ellipse([cx_ - rx_, cy_ - ry_, cx_ + rx_, cy_ + ry_], fill=(26, 28, 34, 122))
         img = Image.alpha_composite(img.convert("RGBA"),
-                                    layer.filter(ImageFilter.GaussianBlur(10))).convert("RGB")
+                                    layer.filter(ImageFilter.GaussianBlur(9))).convert("RGB")
         d = ImageDraw.Draw(img)
-    for _depth, poly, fill in tris:
-        d.polygon(poly, fill=fill, outline=outline if draw_outline else None)
+    for _depth, poly, fill, skip_out in tris:
+        d.polygon(poly, fill=fill, outline=None if (skip_out or not draw_outline) else outline)
     img.save(out_path)
     return {"faces_drawn": len(tris), "px_per_m": round(scale, 2), "view": view,
             "rot_z": rot_z, "width": width, "height": height}

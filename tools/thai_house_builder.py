@@ -49,6 +49,7 @@ SPEC = {
     "bargeboards": True,      # ป้านลม
     "balusters": True,        # ลูกกรงระเบียง
     "braces": True,           # ไม้ค้ำยันใต้พื้น
+    "stair_handrails": True,  # ราวจับบันได (ปิดได้ถ้าภาพรก)
     # ── สี (r,g,b 0..1) ──
     "colors": {
         "post": (0.28, 0.17, 0.10),
@@ -282,11 +283,12 @@ def build(spec):
                                                      (s * (sw / 2 - 0.02),
                                                       y_top - run / 2 + 0.06, ph / 2),
                                                      chamfer=ch * 0.3), C["rail"])
-        add(f"stair_handrail_{tag}", ml.slanted_slab(0.07, stringer * 0.96, 0.09, -ang,
-                                                     (s * (sw / 2 - 0.02),
-                                                      y_top - run / 2 + 0.06,
-                                                      ph / 2 + rail_h * 0.92),
-                                                     chamfer=ch * 0.3), C["rail"])
+        if spec.get("stair_handrails", True):
+            add(f"stair_handrail_{tag}", ml.slanted_slab(0.07, stringer * 0.96, 0.09, -ang,
+                                                         (s * (sw / 2 - 0.02),
+                                                          y_top - run / 2 + 0.06,
+                                                          ph / 2 + rail_h * 0.92),
+                                                         chamfer=ch * 0.3), C["rail"])
     return parts
 
 

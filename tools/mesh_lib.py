@@ -426,6 +426,21 @@ def slanted_slab(length, width, thickness, angle_deg, center=(0.0, 0.0, 0.0), ch
     return translate(part, *center)
 
 
+def scale_part(part, factor, center=(0.0, 0.0, 0.0)):
+    """ย่อ/ขยายเมชรอบจุดที่กำหนด (factor เป็นตัวเลข หรือ (sx, sy, sz))"""
+    if isinstance(factor, (int, float)):
+        fx = fy = fz = float(factor)
+    else:
+        fx, fy, fz = (float(v) for v in factor)
+    verts, faces = part
+    out = [((v[0] - center[0]) * fx + center[0],
+            (v[1] - center[1]) * fy + center[1],
+            (v[2] - center[2]) * fz + center[2]) for v in verts]
+    if fx * fy * fz < 0:                       # สเกลกลับด้าน → ต้องพลิกหน้าเพื่อคงทิศตั้งฉาก
+        faces = [list(reversed(f)) for f in faces]
+    return out, [list(f) for f in faces]
+
+
 # ───────────────────────────── ส่งออก ─────────────────────────────
 
 def write_obj(path, groups, mtl_path=None):
