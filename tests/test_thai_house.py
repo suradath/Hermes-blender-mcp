@@ -206,8 +206,10 @@ r_plain, _ = build_with(chofa=False, bargeboards=False, balusters=False, braces=
 check("ปิดช่อฟ้า/ป้านลม/ลูกกรง/ค้ำยัน/พื้นดิน → ชิ้นน้อยลง", r_plain["parts"] < rep["parts"],
       f"{r_plain['parts']} vs {rep['parts']}")
 check("ปิดของเสริมแล้วยังปิดสนิททุกชิ้น", r_plain["all_watertight"], str(r_plain["bad_parts"]))
-r_more, p_more = build_with(stair_steps=8)
-check("เพิ่มขั้นบันไดเป็น 8 → ชิ้นมากขึ้น", r_more["parts"] > rep["parts"], str(r_more["parts"]))
+_more_steps = int(th.SPEC["stair_steps"]) + 3      # อ้างจากค่าปริยาย ไม่ hardcode
+r_more, p_more = build_with(stair_steps=_more_steps)
+check(f"เพิ่มขั้นบันไดเป็น {_more_steps} → ชิ้นมากขึ้น",
+      r_more["parts"] > rep["parts"], f"{r_more['parts']} vs {rep['parts']}")
 r_ch, _ = build_with(chamfer=0.0)
 check("chamfer=0 → จุดน้อยลง", r_ch["vertices"] < rep["vertices"], f"{r_ch['vertices']} vs {rep['vertices']}")
 r_big, _ = build_with(width=8.0, depth=5.5)
@@ -232,7 +234,10 @@ with tempfile.TemporaryDirectory() as td:
     m = (pathlib.Path(td) / "h.mtl").read_text(encoding="utf-8")
     for key in ("post", "deck", "wall", "roof", "roof2", "trim", "frame", "opening", "rail", "ground"):
         check(f"วัสดุ «{key}» อยู่ใน .mtl", f"newmtl {key}" in m)
-    check("สีหลังคา terracotta อยู่ในไฟล์", "0.55" in m)
+    # Kd เขียนเป็น linear (0.55 sRGB → ~0.2633) ตามที่ Blender คาดหวัง
+    lin = 0.55 / 12.92 if 0.55 <= 0.04045 else ((0.55 + 0.055) / 1.055) ** 2.4
+    check("สีหลังคา terracotta อยู่ในไฟล์ (แบบ linear)",
+          f"{lin:.4f}" in m, f"ต้องการ Kd ~{lin:.4f} · พบ: {m[m.find('Kd'):m.find('Kd')+28]}")
 
 # ===========================================================================
 section("[5] สร้างซ้ำได้ผลเดิม")

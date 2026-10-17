@@ -40,7 +40,7 @@ SPEC = {
     "veranda_depth": 1.80,
     "veranda_roof_height": 0.95,
     "rail_height": 0.95,
-    "stair_steps": 5,
+    "stair_steps": 9,
     "stair_width": 1.40,
     "ground": True,           # แผ่นฐานดินใต้เรือน
     # ── ความละเอียด ──
@@ -109,14 +109,20 @@ def build(spec):
         add(f"post_veranda_{i}", ml.chamfered_box(post / 2, post / 2, ph / 2, ch * 0.4,
                                                   (x, -D / 2 - vd * 0.92, ph / 2)), C["post"])
     if spec["braces"]:
-        bl = math.hypot(post * 2.6, ph * 0.42)
+        # ⚠️ ไม้ค้ำยันต้อง "พาดของจริง": โคนจรดโคนเสา ปลายบนจรดใต้คาน
+        #    เดิมใช้ความยาวลอย ๆ + วางกลางอากาศ → ปลายทั้งสองข้างไม่แตะอะไรเลย
+        run_x = post * 2.2                      # ระยะราบ (จากเสาเข้าหาศูนย์กลาง)
+        run_z = ph - 0.16                       # ระยะดิ่ง (จากโคนเสาถึงใต้คาน)
+        bl = math.hypot(run_x, run_z)
+        ang = math.degrees(math.atan2(run_x, run_z))   # เอียงจากแนวตั้ง
         for j, y in enumerate(ys):
             for s in (-1, 1):
-                # เอียงในระนาบ X-Z → ต้องหมุนรอบแกน Y (ไม่ใช่ round X)
+                # เอียงในระนาบ X-Z → หมุนรอบแกน Y
                 add(f"brace_{j}_{'L' if s < 0 else 'R'}",
                     ml.translate(ml.rotate(ml.chamfered_box(post * 0.34, post * 0.34, bl / 2,
-                                                            ch * 0.3), ry=-s * 34),
-                                 s * (W * 0.42 - post * 1.4), y, ph * 0.58), C["post"])
+                                                            ch * 0.3), ry=-s * ang),
+                                 s * (W * 0.42 - post * 0.6 - run_x / 2), y,
+                                 0.08 + run_z / 2), C["post"])
 
     # ── คานรับพื้น ──
     beam_w = post * 1.3
@@ -198,8 +204,8 @@ def build(spec):
             for k in range(segs):
                 tt = k / (segs - 1)
                 ang = s * (10.0 + 46.0 * tt)             # 10° → 56°
-                seg_len = 0.30 - 0.045 * k
-                w = 0.075 - 0.007 * k
+                seg_len = 0.34 - 0.048 * k
+                w = 0.105 - 0.009 * k
                 dx = math.sin(math.radians(ang)) * seg_len * 0.5
                 dz = math.cos(math.radians(ang)) * seg_len * 0.5
                 add(f"chofa_{tag}_{k}", ml.translate(
@@ -214,17 +220,17 @@ def build(spec):
                                  (0.0, -D / 2 - 0.06, floor_top + door_h / 2)), C["opening"])
     add("door_frame", ml.chamfered_box(door_w / 2 + 0.11, 0.05, door_h / 2 + 0.11, ch * 0.4,
                                        (0.0, -D / 2 - 0.035, floor_top + door_h / 2)), C["frame"])
-    win_w, win_h = W * 0.15, wh * 0.28
+    win_w, win_h = W * 0.19, wh * 0.34
     for s, tag in ((-1, "L"), (1, "R")):
-        add(f"window_front_frame_{tag}", ml.chamfered_box(win_w / 2 + 0.10, 0.05,
-                                                          win_h / 2 + 0.10, ch * 0.4,
+        add(f"window_front_frame_{tag}", ml.chamfered_box(win_w / 2 + 0.11, 0.05,
+                                                          win_h / 2 + 0.11, ch * 0.4,
                                                           (s * W * 0.29, -D / 2 - 0.035,
                                                            floor_top + wh * 0.62)), C["frame"])
         add(f"window_front_{tag}", ml.chamfered_box(win_w / 2, 0.05, win_h / 2, 0.02,
                                                     (s * W * 0.29, -D / 2 - 0.06,
                                                      floor_top + wh * 0.62)), C["opening"])
-        add(f"window_side_frame_{tag}", ml.chamfered_box(0.05, win_w / 2 + 0.10,
-                                                         win_h / 2 + 0.10, ch * 0.4,
+        add(f"window_side_frame_{tag}", ml.chamfered_box(0.05, win_w / 2 + 0.11,
+                                                         win_h / 2 + 0.11, ch * 0.4,
                                                          (s * (W / 2 + 0.035), D * 0.12,
                                                           floor_top + wh * 0.62)), C["frame"])
         add(f"window_side_{tag}", ml.chamfered_box(0.05, win_w / 2, win_h / 2, 0.02,
@@ -268,23 +274,34 @@ def build(spec):
     steps = int(spec["stair_steps"])
     sw = float(spec["stair_width"])
     step_h = ph / steps
-    step_d = 0.33
+    step_d = 0.30
     run = step_d * steps
     y_top = ry - 0.22          # เริ่มบันไดนอกราวระเบียง
+    # ⚠️ slanted_slab หมุนรอบแกน X และวัดมุมจาก "แนวนอน" — ang จึงต้องเป็น
+    #    atan2(ph, run) ตรง ๆ และต้องหมุนเป็น +ang เพื่อให้ปลาย +Y (ด้านบน) อยู่สูง
+    #    (เดิมใช้ -ang → ไม้ข้างเอียงลงสวนทางขั้นบันได ดูเหมือนบันไดพัง)
     ang = math.degrees(math.atan2(ph, run))
+    slab_ang = ang
     for i in range(steps):
         z_top = ph - (i + 1) * step_h + step_h
         y = y_top - step_d * (i + 0.5)
-        add(f"stair_{i}", ml.chamfered_box(sw / 2 * 0.94, step_d / 2 * 0.92, 0.055, ch * 0.3,
-                                           (0.0, y, z_top - 0.03)), C["deck"])
+        if i == steps - 1:
+            # ⚠️ ขั้นล่างสุดต้อง "หนาถึงพื้น" (z=0) ไม่ใช่ลอยเหนือพื้น 7-8 ซม.
+            #    วัดแล้วเดิมขั้นล่างลอยอยู่ที่ z=+0.078 → เห็นเป็นช่องว่างใต้ขั้นแรก
+            half = max(0.055, z_top / 2.0)
+            add(f"stair_{i}", ml.chamfered_box(sw / 2 * 0.94, step_d / 2 * 0.92, half, ch * 0.3,
+                                               (0.0, y, z_top - half)), C["deck"])
+        else:
+            add(f"stair_{i}", ml.chamfered_box(sw / 2 * 0.94, step_d / 2 * 0.92, 0.055, ch * 0.3,
+                                               (0.0, y, z_top - 0.03)), C["deck"])
     stringer = math.hypot(ph, run)
     for s, tag in ((-1, "L"), (1, "R")):
-        add(f"stair_stringer_{tag}", ml.slanted_slab(0.15, stringer, 0.26, -ang,
+        add(f"stair_stringer_{tag}", ml.slanted_slab(0.15, stringer, 0.26, -slab_ang,
                                                      (s * (sw / 2 - 0.02),
                                                       y_top - run / 2 + 0.06, ph / 2),
                                                      chamfer=ch * 0.3), C["rail"])
         if spec.get("stair_handrails", True):
-            add(f"stair_handrail_{tag}", ml.slanted_slab(0.07, stringer * 0.96, 0.09, -ang,
+            add(f"stair_handrail_{tag}", ml.slanted_slab(0.07, stringer * 0.96, 0.09, -slab_ang,
                                                          (s * (sw / 2 - 0.02),
                                                           y_top - run / 2 + 0.06,
                                                           ph / 2 + rail_h * 0.92),

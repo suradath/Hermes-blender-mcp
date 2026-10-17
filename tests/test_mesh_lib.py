@@ -272,12 +272,26 @@ with tempfile.TemporaryDirectory() as td:
     check("วัสดุครบตามที่ใช้จริง (ผิว/เข็มขัด/ผ้า/ตา)",
           all(f"newmtl {k}" in m for k in mats), str([k for k in mats if f"newmtl {k}" not in m]))
     check("ทุกวัสดุมีสี Kd", m.count("Kd ") >= 4, str(m.count("Kd ")))
-    check("สีวัสดุตรงกับสเปก (ผิว 0.88 0.69 0.50)", "0.8800 0.6900 0.5000" in m)
-    # อ่านกลับ: จุดที่เขียนต้องเท่ากับจุดในเมช (ทศนิยม 6 ตำแหน่ง)
+    # ⚠️ Kd ถูกเขียนเป็นค่า linear (มาตรฐานที่ Blender ใช้) ไม่ใช่ค่า sRGB ดิบ
+    lin = [ml._srgb_to_linear(c) for c in (0.88, 0.69, 0.50)]
+    check("สีวัสดุเขียนเป็น linear ตามที่ Blender คาดหวัง",
+          f"Kd {lin[0]:.4f} {lin[1]:.4f} {lin[2]:.4f}" in m,
+          f"ต้องการ Kd {lin[0]:.4f} {lin[1]:.4f} {lin[2]:.4f}")
+    check("ไม่เขียนค่า sRGB ดิบลง Kd อีก", "0.8800 0.6900 0.5000" not in m)
+    # ⚠️ พิกัดถูกแปลง Z-up → Y-up (มาตรฐาน OBJ): (x, y, z) → (x, z, -y)
+    x0, y0, z0 = parts[0][1][0][0]
     first = txt[[i for i, l in enumerate(txt) if l.startswith("v ")][0]]
-    check("จุดแรกที่เขียนตรงกับเมช", first == f"v {parts[0][1][0][0][0]:.6f} "
-                                             f"{parts[0][1][0][0][1]:.6f} {parts[0][1][0][0][2]:.6f}",
-          first)
+    check("จุดแรกถูกแปลงเป็น Y-up ตามมาตรฐาน OBJ",
+          first == f"v {x0:.6f} {z0:.6f} {-y0:.6f}", first)
+    # สวิตช์ปิดได้ (สำหรับคนที่ต้องการไบต์ดิบ)
+    raw_obj = pathlib.Path(td) / "raw.obj"
+    raw_mtl = pathlib.Path(td) / "raw.mtl"
+    ml.write_obj(raw_obj, parts, mtl_path=raw_mtl, up="Z", linear_colors=False)
+    raw_txt = raw_obj.read_text(encoding="utf-8").splitlines()
+    raw_first = raw_txt[[i for i, l in enumerate(raw_txt) if l.startswith("v ")][0]]
+    check("up='Z' + linear_colors=False → ได้ไบต์ดิบเดิม",
+          raw_first == f"v {x0:.6f} {y0:.6f} {z0:.6f}", raw_first)
+    check("และ Kd กลับเป็นค่า sRGB ดิบ", "0.8800 0.6900 0.5000" in raw_mtl.read_text(encoding="utf-8"))
 
 # ===========================================================================
 section("[5] สคริปต์ฝั่ง Blender (แต่งให้เนียน) ต้องผ่านด่านและทำงานได้จริง")

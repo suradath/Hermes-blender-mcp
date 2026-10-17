@@ -443,8 +443,25 @@ def scale_part(part, factor, center=(0.0, 0.0, 0.0)):
 
 # ───────────────────────────── ส่งออก ─────────────────────────────
 
-def write_obj(path, groups, mtl_path=None):
-    """เขียนไฟล์ .obj (+ .mtl) · groups = [(ชื่อ, (verts, faces), ชื่อวัสดุ), ...]
+def _srgb_to_linear(c: float) -> float:
+    """แปลงค่าสีแบบ sRGB (ที่ตาเห็น) → linear (ที่ Blender เก็บ)
+
+    บทเรียนจริง: เขียน Kd เป็น sRGB แล้วนำเข้า Blender (ซึ่งถือว่า Kd เป็น linear)
+    ทำให้สีออก "ชมพูซีด" — ต้องแปลงก่อนเขียน
+    """
+    c = max(0.0, min(1.0, float(c)))
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def write_obj(path, groups, mtl_path=None, up="Y", linear_colors=True):
+    """เขียนไฟล์ .obj (+ .mtl) · groups = [(ชื่อ, (verts, faces), วัสดุ), ...]
+
+    ค่าปริยายตั้งตามมาตรฐานของ OBJ เพื่อให้นำเข้าโปรแกรมอื่นได้ทันที:
+      - ``up="Y"``  → แปลงพิกัดจาก Z-up (ของ Blender) เป็น Y-up (มาตรฐาน OBJ)
+        ไม่งั้นโปรแกรมที่ถือว่า Y-up จะทำให้โมเดล "นอนตะแคง"
+      - ``linear_colors=True`` → เขียน Kd เป็นค่า linear (Blender ถือว่า Kd เป็น linear)
+        ไม่งั้นสีจะออกซีด/ชมพู
+    ใช้ ``up="Z", linear_colors=False`` ถ้าต้องการไบต์แบบเดียวกับข้อมูลดิบ
 
     Blender นำเข้าได้ด้วยคำสั่งเดียว: ``bpy.ops.wm.obj_import(filepath=...)``
     """
@@ -464,7 +481,12 @@ def write_obj(path, groups, mtl_path=None):
         if m and mtl_name:
             lines.append(f"usemtl {m['name']}")          # ⚠️ ขาดบรรทัดนี้ = นำเข้าแล้วไม่มีวัสดุ
         for v in verts:
-            lines.append(f"v {v[0]:.6f} {v[1]:.6f} {v[2]:.6f}")
+            if up.upper() == "Y":
+                # Z-up → Y-up: หมุน -90° รอบแกน X  (x, y, z) → (x, z, -y)
+                x, y, z = v[0], v[2], -v[1]
+            else:
+                x, y, z = v[0], v[1], v[2]
+            lines.append(f"v {x:.6f} {y:.6f} {z:.6f}")
         for f in faces:
             lines.append("f " + " ".join(str(i + base) for i in f))
         base += len(verts)
@@ -473,7 +495,10 @@ def write_obj(path, groups, mtl_path=None):
         m = ["# วัสดุสำหรับ mesh_lib"]
         for mat in _unique_mats(groups):
             m.append(f"newmtl {mat['name']}")
-            m.append(f"Kd {mat['color'][0]:.4f} {mat['color'][1]:.4f} {mat['color'][2]:.4f}")
+            c = mat["color"]
+            if linear_colors:
+                c = [_srgb_to_linear(x) for x in c[:3]]
+            m.append(f"Kd {c[0]:.4f} {c[1]:.4f} {c[2]:.4f}")
             m.append("Ka 0.2 0.2 0.2")
             m.append("Ks 0.05 0.05 0.05")
             m.append("Ns 20")
