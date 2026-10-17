@@ -292,8 +292,11 @@ class BridgeClient:
         while time.time() < deadline:
             try:
                 s = socket.create_connection((self.host, self.port), timeout=3.0)
-                s.settimeout(self.timeout)
+                # ⚠️ ตรวจ token ต้องตอบเร็วมาก (มิลลิวินาที) — เดิมตั้ง timeout เท่า
+                #    self.timeout (300 วิ) ทำให้ค้างเงียบได้ 5 นาทีโดยไม่มี log อะไรเลย
+                s.settimeout(8.0)
                 f = s.makefile("rwb")
+                log(f"TCP ต่อติด พอร์ต {self.port} · กำลังตรวจ token ...")
                 f.write(json.dumps({"token": self.token}).encode() + b"\n")
                 f.flush()
                 line = f.readline()
@@ -307,6 +310,9 @@ class BridgeClient:
                 return
             except Exception as exc:  # noqa: BLE001 - ลองซ้ำจนหมดเวลา
                 last = exc
+                # กล่องดำ: บอกทุกครั้งว่า attempt นี้พลาดเพราะอะไร (เดิมเงียบสนิท)
+                if not self.info:
+                    log(f"ต่อสะพานยังไม่สำเร็จ ({type(exc).__name__}: {exc}) — ลองใหม่")
                 time.sleep(0.4)
         raise BridgeError(f"ต่อสะพานไม่สำเร็จใน {timeout:.0f} วินาที: {last}")
 
