@@ -15,6 +15,7 @@ test_example_character.py — ทดสอบ "ตัวอย่างสร้
 from __future__ import annotations
 
 import json
+import math
 import pathlib
 import sys
 
@@ -177,6 +178,76 @@ if doc.is_file():
           "mcp_blender_get_viewport_screenshot" in d,
           "ผู้ใช้ต้องรู้ว่าต้องเรียกอะไร")
     check("คู่มือมีขั้นตอนเป็นข้อ ๆ (อย่างน้อย 5 ขั้น)", d.count("\n1. ") >= 1 and "7." in d)
+
+# ===========================================================================
+section("[5] ตัวละครจริงจากรูปที่แนบมา (T-pose · หัวโล้น · ตา · เข็มขัด · เท้า)")
+# ===========================================================================
+# ค่าที่ "วัดจากพิกเซลของรูปจริง" (ไม่ใช่เดาด้วยตา) — ได้จากสคริปต์วัด silhouette:
+#   ความสูงรวม 751 px · หัว 247 px → 3.04 หัว · แขนกว้าง 0.872H · อกกว้าง 0.25H
+#   เป้าที่ 0.759H จากยอด (= 0.241H จากพื้น) · ขายาว 0.24H · สีผิว #e0b080 · เข็มขัด #704020
+MEASURED = {"heads_tall": 3.04, "head_h": 0.329, "arm_span": 0.872, "torso_or_chest_w": 0.25,
+            "crotch_z": 0.241, "leg_len": 0.24}
+
+fake_bpy.reset()
+# AI ทำแบบนี้จริง: แปลง "ค่าที่วัดได้" เป็นสเปกในหน่วย "หัว" แล้วแก้ในไฟล์
+ref = (source
+       .replace('"heads_tall": 7.5,', '"heads_tall": 3.04,')          # ตัวตุ๊กตา 3 หัว
+       .replace('"shoulder_width_heads": 1.7,', '"shoulder_width_heads": 0.85,')
+       .replace('"arm_length_heads": 3.0,', '"arm_length_heads": 0.95,')
+       .replace('"leg_length_heads": 3.8,', '"leg_length_heads": 2.2,')
+       .replace('"pose": "stand",', '"pose": "tpose",')
+       .replace('"shirt": True,', '"shirt": False,')
+       .replace('"pants": True,', '"pants": False,')
+       .replace('"hair": True,', '"hair": False,')
+       .replace('"face": False,', '"face": True,')
+       .replace('"belt": False,', '"belt": True,')
+       .replace('"feet": False,', '"feet": True,')
+       .replace('"color_skin": (0.95, 0.76, 0.65),', '"color_skin": (0.88, 0.69, 0.50),')
+       .replace('"color_belt": (0.44, 0.25, 0.13),', '"color_belt": (0.44, 0.25, 0.13),'))
+check("แก้สเปกเป็นค่าที่วัดจากรูปได้ (11 จุด)", ref != source and '"heads_tall": 3.04,' in ref)
+check("สเปกใหม่ยังผ่านด่านความปลอดภัย", not br.scan_code(ref).violations)
+
+r = run_script(ref)
+check("รันตัวละครจากรูปสำเร็จ", r.get("ok") is True, str(r.get("error"))[:200])
+res5 = ((r.get("result") or {}).get("result") or {})
+names5 = [o.name for o in fake_bpy.data.objects]
+check("ได้ชิ้นส่วนครบ 14 ชิ้น (ขา2+เท้า2+สะโพก+เข็มขัด+ผ้าเตี่ยว+ลำตัว+แขน2+คอ+หัว+ตา2)",
+      res5.get("part_count") == 14, str(res5.get("part_count")))
+check("หัวโล้นจริง — ไม่มีชิ้น 'hair'", not any(n.endswith("_hair") for n in names5), str(sorted(names5)))
+for want in ("_eye_L", "_eye_R", "_belt", "_cloth", "_foot_L", "_foot_R"):
+    check(f"มีชิ้นส่วน {want}", any(n.endswith(want) for n in names5), str(sorted(names5)))
+check("ท่าเป็น T-pose ตามรูป", res5.get("pose") == "tpose", str(res5.get("pose")))
+
+# ── เทียบสัดส่วนที่โมเดลสร้าง กับ ที่วัดจากรูป ──
+rat = res5.get("ratios") or {}
+print(f"    ที่วัดจากรูป: {MEASURED}")
+print(f"    โมเดลสร้าง : {rat}")
+for key, got, tol in [("head_h", rat.get("head_h"), 0.03),
+                      ("arm_span", rat.get("arm_span"), 0.08),
+                      ("shoulder_w", rat.get("shoulder_w"), 0.05),
+                      ("crotch_z", rat.get("crotch_z"), 0.03),
+                      ("leg_len", rat.get("leg_len"), 0.04)]:
+    want = MEASURED.get(key) if key != "shoulder_w" else MEASURED["torso_or_chest_w"]
+    check(f"สัดส่วน {key} ตรงกับที่วัดจากรูป (±{tol}) — ได้ {got} วัดได้ {want}",
+          got is not None and abs(got - want) <= tol, f"{got} vs {want}")
+check("จำนวนหัวที่ทับได้ตรงกับที่วัด (3.04)",
+      abs((res5.get("height_heads") or 0) - MEASURED["heads_tall"]) < 0.02,
+      str(res5.get("height_heads")))
+
+arm = fake_bpy.data.objects[[n for n in names5 if n.endswith("_arm_L")][0]]
+# ⚠️ ในสคริปต์ bpy ดิบ มุมเป็น "เรเดียน" (เครื่องมือ MCP ที่รับค่าจาก AI ใช้ "องศา" แล้วแปลงให้)
+check("แขนวางแนวนอนจริง (หมุน 90 องศา = 1.5708 เรเดียน รอบแกน Y)",
+      abs(arm.rotation_euler[1] - math.pi / 2.0) < 0.01, str(arm.rotation_euler))
+span_half = (res5["ratios"]["arm_span"] * res5["height_m"]) / 2.0
+check("ปลายแขนข้างนอกอยู่ที่ระยะครึ่งหนึ่งของช่วงแขนพอดี",
+      abs((arm.location[0] + arm.scale[2]) - span_half) < 0.01,
+      f"{arm.location[0] + arm.scale[2]} vs {span_half}")
+check("สีผิวที่โมเดลใช้ตรงกับที่สุ่มจากรูป (#e0b080 → 0.88,0.69,0.50)",
+      any("0.88_0.69_0.5" in m for m in _names(fake_bpy.data.materials)),
+      str(_names(fake_bpy.data.materials)))
+check("เท้าอยู่ติดพื้น (ไม่ลอย)", all(
+    abs(fake_bpy.data.objects[n].location[2] - fake_bpy.data.objects[n].scale[2]) < 0.005
+    for n in names5 if n.endswith(("_foot_L", "_foot_R"))))
 
 print()
 print("=" * 70)
