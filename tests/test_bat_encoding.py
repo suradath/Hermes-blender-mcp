@@ -105,6 +105,28 @@ for name in BATS:
     check(f"{name} บรรทัดความคืบหน้าเป็น ASCII", all(l.isascii() for l in steps), str(steps))
 
 
+section("[6] ห้ามมีวงเล็บในข้อความ echo (cmd จะปิดบล็อก if ผิดที่)")
+for name in BATS:
+    p = ROOT / name
+    if not p.is_file():
+        continue
+    lines = p.read_text(encoding="utf-8").splitlines()
+    parens = [(i + 1, l.strip()[:60]) for i, l in enumerate(lines)
+              if l.strip().lower().startswith("echo") and ("(" in l or ")" in l)]
+    check(f"{name} ไม่มีวงเล็บใน echo", not parens,
+          "เจอ: " + str(parens[:3]) + " — ใช้ - แทน หรือย้ายข้อความออกนอกบล็อก if")
+
+section("[7] ไฟล์ .bat ต้องเป็น CRLF (LF เดี่ยวทำให้บล็อก if พัง)")
+for name in BATS:
+    p = ROOT / name
+    if not p.is_file():
+        continue
+    raw = p.read_bytes()
+    lone_lf = raw.count(b"\n") - raw.count(b"\r\n")
+    check(f"{name} ขึ้นบรรทัดด้วย CRLF ทั้งไฟล์", lone_lf == 0,
+          f"พบ LF เดี่ยว {lone_lf} บรรทัด — แปลงเป็น CRLF")
+
+
 print()
 if failed:
     print(f"❌ ล้มเหลว {len(failed)} รายการ")

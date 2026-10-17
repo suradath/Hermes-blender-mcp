@@ -17,9 +17,12 @@
 Makefile    text eol=lf
 
 # สคริปต์ Windows ต้องเป็น CRLF เสมอ (cmd.exe ต้องการ)
-*.bat       text eol=crlf
-*.cmd       text eol=crlf
-*.ps1       text eol=crlf
+# ใช้ -text (ไม่แปลง) เพราะ GitHub สร้าง ZIP จากไบต์ที่เก็บไว้ตรง ๆ —
+# ถ้าใช้ text eol=crlf ไบต์ในรีโปจะเป็น LF และ ZIP จะได้ LF ทำให้บล็อก if ของ
+# batch พังบนเครื่องที่ดาวน์โหลด ZIP ไป  (เจอจริง: ". was unexpected at this time.")
+*.bat       -text
+*.cmd       -text
+*.ps1       -text
 
 # ไฟล์ไบนารี — ห้ามแตะ
 *.png       binary
