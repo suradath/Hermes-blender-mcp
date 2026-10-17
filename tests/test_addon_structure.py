@@ -204,6 +204,13 @@ check("ผู้ดำเนินการเรียกฟังก์ชั�
       "start_bridge(context)" in src and "stop_bridge(context)" in src)
 check("แผงมีติ๊ก autostart ให้เห็น", 'prop(s, "autostart")' in src)
 
+# ── บทเรียนจริง: sys.exit() ในสคริปต์ --python สั่งปิด Blender ──────────────
+_bridge_src = (ROOT / "blender_bridge.py").read_text(encoding="utf-8")
+check("blender_bridge ไม่เรียก sys.exit() ตอนจบ (Blender จะปิดตัว)",
+      "sys.exit(main())" not in _bridge_src,
+      "โหมด timer: หน้าต่างเปิดแล้วปิดทันที + เซิร์ฟเวอร์ได้ refused")
+
+
 print()
 print("=" * 70)
 if failed:

@@ -1503,4 +1503,13 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # ⚠️⚠️ ห้ามใช้ sys.exit() ในสคริปต์ --python ของ Blender ⚠️⚠️
+    #    Blender ตีความ SystemExit ที่หลุดจากสคริปต์ = สั่ง "ปิดโปรแกรม"
+    #    อาการที่เจอจริง (โหมด timer / --gui):
+    #      • หน้าต่าง Blender เปิดขึ้นแล้วปิดทันที
+    #      • เซิร์ฟเวอร์ต่อติดครั้งแรก (ConnectionReset) แล้ว refused ตลอด
+    #      • ไม่มี log "timer เต้นปกติ" เพราะโปรเซสตายก่อน timer จะได้ทำงาน
+    #    โหมด main ไม่โดนเพราะ serve_blocking ไม่คืนค่า จนไคลเอนต์ตัดการเชื่อมต่อ
+    _code = main()
+    if _code:
+        log(f"จบด้วยรหัส {_code}")
