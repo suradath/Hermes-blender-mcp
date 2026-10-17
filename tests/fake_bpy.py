@@ -192,6 +192,36 @@ class FakeLight:
 
 
 # ------------------------------------------------------------------ วัตถุ
+class FakeModifier:
+    def __init__(self, name, mtype):
+        self.name, self.type = name, mtype
+        self.width = 0.0
+        self.segments = 1
+        self.levels = 0
+        self.render_levels = 0
+        self.limit_method = "ANGLE"
+
+
+class FakeModifierList(list):
+    """``obj.modifiers`` ของจริง: .new(name, type) คืน modifier · .pop(name) ลบตามชื่อ"""
+
+    def new(self, name, mtype):
+        m = FakeModifier(name, mtype)
+        self.append(m)
+        return m
+
+    def pop(self, key=None, default=None):
+        if isinstance(key, int):                   # รองรับ list.pop(index) แบบเดิม
+            return list.pop(self, key)
+        for i, m in enumerate(self):
+            if m.name == key:
+                return list.pop(self, i)
+        return default
+
+    def get(self, name):
+        return next((m for m in self if m.name == name), None)
+
+
 class FakeObject(_Named):
     _seq = 0
 
@@ -209,13 +239,18 @@ class FakeObject(_Named):
                              [0.0, 0.0, 1.0, loc[2]], [0.0, 0.0, 0.0, 1.0]]
         self.parent = None
         self.children = []
-        self.modifiers = []
+        self.modifiers = FakeModifierList()
         self.vertex_groups = []
         self.hide_render = False
         self.hidden = False
         self.users_collection = []
         self.data = FakeMesh(name + "_mesh") if otype == "MESH" else None
+        self.selected = False
         self._custom = {}
+
+    def select_set(self, state=True):
+        self.selected = bool(state)
+        return None
 
     def visible_get(self):
         return not self.hidden
@@ -325,6 +360,7 @@ class FakeScene:
             "image_settings": type("I", (), {"file_format": "PNG"})(),
         })()
         self.world = FakeWorld("World")
+        self.selected = []
         self.collection = FakeSceneCollection("Scene Collection")
         self.camera = None          # ของจริงตั้งกล้องให้ฉากเริ่มต้น — reset() จะตั้งให้
 
@@ -346,6 +382,7 @@ class FakeOps:
         self._wm = _FakeWmOps(self)
         self._render = _FakeRenderOps(self)
         self._import_scene = _FakeImportOps(self)
+        self._object = _FakeObjectOps(self)
 
     # bpy.ops.mesh.*
     @property
@@ -366,6 +403,11 @@ class FakeOps:
     @property
     def import_scene(self):
         return self._import_scene
+
+    # bpy.ops.object.*
+    @property
+    def object(self):
+        return self._object
 
 
 _MESH_IDENTIFIERS = {
@@ -483,6 +525,38 @@ class _FakeImportOps:
         return self._import("usd", filepath, objects=1)
 
 
+class _FakeObjectOps:
+    """bpy.ops.object.* ที่สคริปต์แต่งโมเดลใช้"""
+
+    def __init__(self, ops):
+        self._ops = ops
+
+    def modifier_apply(self, modifier="", **kw):  # noqa: ARG002
+        self._ops.calls.append(("object.modifier_apply", {"modifier": modifier}))
+        obj = DATA.scenes[0].collection.objects[-1] if DATA.scenes[0].collection.objects else None
+        if obj is not None:
+            obj.modifiers.pop(modifier, None)
+            getattr(obj, "_applied", []).append(modifier) if hasattr(obj, "_applied") \
+                else setattr(obj, "_applied", [modifier])
+        return {"FINISHED"}
+
+    def shade_smooth(self, **kw):  # noqa: ARG002
+        self._ops.calls.append(("object.shade_smooth", {}))
+        return {"FINISHED"}
+
+    def shade_flat(self, **kw):  # noqa: ARG002
+        self._ops.calls.append(("object.shade_flat", {}))
+        return {"FINISHED"}
+
+    def join(self, **kw):  # noqa: ARG002
+        self._ops.calls.append(("object.join", {}))
+        return {"FINISHED"}
+
+    def select_all(self, action="SELECT", **kw):  # noqa: ARG002
+        self._ops.calls.append(("object.select_all", {"action": action}))
+        return {"FINISHED"}
+
+
 class _FakeWmOps:
     def __init__(self, ops: FakeOps):
         self._ops = ops
@@ -496,6 +570,21 @@ class _FakeWmOps:
     def save_mainfile(self):
         self._ops.calls.append(("wm.save_mainfile", {}))
         return {"FINISHED"}
+
+    def obj_import(self, filepath="", **kw):  # noqa: ARG002
+        """bpy.ops.wm.obj_import — สร้างวัตถุจำลอง 2 ชิ้น แล้วตั้งเป็น selected"""
+        self._ops.calls.append(("wm.obj_import", {"filepath": filepath}))
+        made = []
+        for i in range(2):
+            name = _unique_name(f"{pathlib.Path(filepath).stem}_{i + 1}")
+            obj = FakeObject(name)
+            DATA.objects.add(obj)
+            DATA.scenes[0].collection.objects.append(obj)
+            obj.users_collection = [DATA.scenes[0].collection]
+            made.append(obj)
+        DATA.scenes[0].selected = made
+        return made
+
 
     def quit_blender(self):  # มีไว้ให้เทสต์ตรวจว่าด่านความปลอดภัยกันได้จริง
         self._ops.calls.append(("wm.quit_blender", {}))
@@ -579,6 +668,29 @@ class FakeData:
 DATA = FakeData()
 
 
+class _VLObjects:
+    def __init__(self):
+        self.active = None
+
+
+class _ViewLayer:
+    def __init__(self):
+        self.objects = _VLObjects()
+
+
+class _Ctx:
+    def __init__(self, scene):
+        self.scene = scene
+        self.view_layer = _ViewLayer()
+
+    @property
+    def selected_objects(self):
+        return getattr(self.scene, "selected", []) or []
+
+
+context = _Ctx(DATA.scenes[0])
+
+
 def reset(background: bool = True):
     """ล้างสถานะให้เทสต์แต่ละข้อเริ่มจากศูนย์"""
     global DATA, app, ops, context, data
@@ -609,14 +721,14 @@ def reset(background: bool = True):
     props.objects.append(a)
     a.users_collection = [props]
     a.modifiers.append(FakeModifier("Subdivision"))
-    context = type("Ctx", (), {"scene": scene})()
+    context = _Ctx(scene)
     globals()["context"] = context
 
 
 # ค่าเริ่มต้นเมื่อ import (ให้เทสต์เรียก reset() เองได้)
 app = FakeApp()
 ops = FakeOps()
-context = type("Ctx", (), {"scene": DATA.scenes[0]})()
+context = _Ctx(DATA.scenes[0])
 # ชื่อ attribute ต้องตรงกับ API จริง: bpy.data / bpy.ops / bpy.app / bpy.context
 data = DATA
 
