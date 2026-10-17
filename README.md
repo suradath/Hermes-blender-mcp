@@ -11,7 +11,7 @@ MCP Server ตัวเดียวที่เชื่อม **Hermes Agent** 
 
 [![tests](https://github.com/suradath/Hermes-blender-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/suradath/Hermes-blender-mcp/actions/workflows/tests.yml)
 **สถานะ:** ชุดทดสอบอัตโนมัติ **797 ข้อ (11 ชุด) ผ่านหมด** ·
-⭐ **`--selftest` ผ่านครบ 11/11 บน Blender 5.2.2 จริง** (Windows 11, 17 ต.ค. 2026)
+⭐ **`--selftest --deep` ผ่านครบ 14/14 บน Blender 5.2.2 จริง** (Windows 11, 17 ต.ค. 2026)
 · [ทดสอบอะไรแล้ว / ยังไม่ได้ทดสอบอะไร](#ทดสอบอะไรแล้ว--ยังไม่ได้ทดสอบอะไร)
 
 ![บ้านทรงไทยโพลิกอนที่สร้างจากเรขาคณิตของโปรเจกต์](docs/images/05-thai-house-3q.png)
@@ -235,6 +235,10 @@ run-hermes-blender-mcp.bat --selftest      :: Windows
 ✅ delete_object: {"deleted": true, "name": "LPM_Test"}
 ✅ get_viewport_screenshot: 320x240.png · 12345 ไบต์
 ✅ resource file_metadata: {"blender_version": "5.2.2", "scene": "Scene"}
+── ตรวจเชิงลึก (--deep) ──
+✅ save_blend_file: selftest.blend · 96,030 ไบต์
+✅ search_polyhaven: เจอ 24 รายการ
+✅ download_polyhaven_asset: painted_wooden_stool → วัตถุ 3 → 4
 ── จบ ──
 ```
 
@@ -570,7 +574,7 @@ bash tests/run_all.sh      # รันทุกชุด (ไม่ต้อง�
 
 | | สถานะ |
 |---|---|
-| ⭐ **รันบน Blender จริง** — Windows 11 + Blender 5.2.2 · `--selftest` **ผ่านครบ 11/11** (ฉาก · สร้าง · ย้าย · วัสดุ · รายละเอียด · สคริปต์ · ลบ · เส้นทางคอลเลกชัน · ภาพหน้าจอ · ทรัพยากร) | ✅ **ยืนยันแล้ว** (17 ต.ค. 2026 · รอบแรก v1.0.0 ผ่าน 8/9 และจับบั๊ก `Collection.parent` ได้จริง) |
+| ⭐ **รันบน Blender จริง** — Windows 11 + Blender 5.2.2 · `--selftest --deep` **ผ่านครบ 14/14** (ฉาก · สร้าง · ย้าย · วัสดุ · รายละเอียด · สคริปต์ · ลบ · เส้นทางคอลเลกชัน · ภาพหน้าจอใต้ `--background` · ทรัพยากร · บันทึก `.blend` 96 KB · ค้น Poly Haven 24 รายการ · **โหลด gltf เข้าฉากจริง 3→4 วัตถุ**) | ✅ **ยืนยันแล้ว** (17 ต.ค. 2026 · รอบแรก v1.0.0 ผ่าน 8/9 และจับบั๊ก `Collection.parent` ได้จริง) |
 | ⭐ **Hermes ตัวจริงเชื่อมต่อได้** — `hermes mcp add` → `✓ Connected! Found 12 tool(s)` | ✅ ยืนยันแล้ว |
 | สื่อสาร MCP (handshake, tool list, สคีมา, เรียกใช้, resource, error) | ✅ MCP client ทางการ (56 ข้อ) |
 | ลิงก์ในเอกสารไม่เสีย | ✅ ตรวจทุก push |
@@ -578,8 +582,9 @@ bash tests/run_all.sh      # รันทุกชุด (ไม่ต้อง�
 | ตรรกะ `bpy` ทุกเครื่องมือ | ✅ กับ `bpy` ปลอมที่เลียนแบบของจริง |
 | stdout สะอาด (ไม่เลอะท่อ JSON-RPC) | ✅ ยืนยัน 0 ไบต์ |
 | ยิง API จริงของ Poly Haven | ✅ ทดสอบแล้ว (ค้น "chair" เจอจริง) |
-| **โหลด Poly Haven จริง + นำเข้าโมเดลลงฉาก** บน Blender จริง | ❌ ยังไม่ได้ทดสอบ (ทดสอบแค่ตัว API กับตรรกะ) — ใช้ `--selftest --deep` เพื่อตรวจได้ |
-| **โหมด viewport (มีหน้าต่าง) + add-on timer** | ❌ ต้องมีคนนั่งกดในหน้าต่าง Blender |
+| **โหลด Poly Haven จริง + นำเข้าโมเดลลงฉาก** | ✅ **ยืนยันแล้ว** — `painted_wooden_stool` (gltf 1k) ดาวน์โหลดแล้ววัตถุเพิ่ม 3 → 4 (`--selftest --deep`) |
+| **บันทึกไฟล์ `.blend` จริง** | ✅ **ยืนยันแล้ว** — 96,030 ไบต์ (`--selftest --deep`) |
+| **โหมด viewport (มีหน้าต่าง) + add-on timer** | ❌ ยังไม่ได้ทดสอบ — ต้องนั่งกดในหน้าต่าง Blender |
 | **การเรนเดอร์ · UI · `bpy.app.timers` ของจริง** | ❌ ต้องมี Blender (โหมด timer) |
 
 > เครื่องที่ใช้พัฒนาไม่มี Blender ติดตั้ง จึงทดสอบได้ถึงชั้น "โปรโตคอล + ตรรกะ + การเชื่อมกับ Hermes"
