@@ -190,6 +190,35 @@ check("ไม่มีอักษรต่างชาติหลุดเล�
       not offenders,
       "; ".join(f"{f}:{i} {c!r} ({n})" for f, i, c, n in offenders[:5]))
 
+section("[6] รูปภาพที่เอกสารอ้างถึง ต้องมีจริงและเป็น PNG ที่สมบูรณ์")
+
+IMG = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)\)")
+imgs = []
+for doc in DOCS:
+    for alt, target in IMG.findall(doc.read_text(encoding="utf-8")):
+        if target.startswith(("http://", "https://")):
+            continue
+        imgs.append((doc, alt, target, (doc.parent / target).resolve()))
+
+check("เอกสารมีรูปประกอบ (!= 0)", len(imgs) > 0, f"พบ {len(imgs)} รูป")
+check("ทุกรูปมีคำบรรยาย alt (ช่วยคนตาบอด/ตอนโหลดช้า)",
+      all(a.strip() for _d, a, _t, _p in imgs),
+      str([(_d.name, t_) for _d, a, t_, _p in imgs if not a.strip()]))
+missing = [(str(d.relative_to(ROOT)), tgt) for d, _a, tgt, path in imgs if not path.is_file()]
+check("ทุกรูปที่อ้างถึงมีไฟล์จริงในรีโป", not missing, str(missing[:5]))
+bad = []
+for _d, _a, tgt, path in imgs:
+    if not path.is_file():
+        continue
+    head = path.read_bytes()[:8]
+    if head != b"\x89PNG\r\n\x1a\n":
+        bad.append((tgt, "ไม่ใช่ PNG"))
+    elif path.stat().st_size < 500:
+        bad.append((tgt, f"เล็กผิดปกติ {path.stat().st_size} ไบต์"))
+check("ทุกรูปเป็นไฟล์ PNG จริงและไม่ว่าง", not bad, str(bad[:5]))
+check("รูปทั้งหมดอยู่ในโฟลเดอร์ของรีโป (ไม่ลิงก์ไปเครื่องใคร)",
+      all(str(path).startswith(str(ROOT)) for *_x, path in imgs), "ต้องเป็นพาธสัมพัทธ์ในรีโป")
+
 print()
 print("=" * 70)
 if failed:
