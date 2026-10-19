@@ -247,6 +247,44 @@ Windows — use double backslashes in JSON:
 | `--attach 127.0.0.1:9876 --token …` | Attach to a Blender that is already running (see step 6) |
 | `--check` / `--list-tools` / `--selftest` | Diagnostics |
 
+### 5.1 Watching the agent work (live mode)
+
+The default is headless: the agent really builds things, but you cannot see them
+(you only get pictures from `get_viewport_screenshot`). To watch objects appear
+one by one, pick **one** of two routes.
+
+**Route 1 (easiest) — `--gui`, no add-on needed**
+
+```yaml
+mcp_servers:
+  blender:
+    command: C:\\Hermes-blender-mcp\\.venv\\Scripts\\python.exe
+    args:
+      - C:\\Hermes-blender-mcp\\blender_mcp_server.py
+      - --gui
+    connect_timeout: 120.0
+    timeout: 300
+    enabled: true
+```
+
+- The first tool call opens **its own Blender window** and you see every change
+- ⚠️ `- --gui` must be on its **own line** — never append it to the path line
+  (the args list would become one string and `--gui` would be ignored)
+- ⚠️ `--gui` launches a **new** Blender; it does not adopt a window you already have open
+- Verify this mode without Hermes:
+
+```bat
+run-hermes-blender-mcp.bat --selftest --gui
+```
+You should see `timer tick ok (1)` followed by `ready - Blender 5.2.2`.
+
+**Route 2 — add-on plus `--attach`: drive the window you already have** (step 6)
+Nothing is launched or closed, and your existing `.blend` stays loaded.
+
+> If objects exist but you cannot see them, press **`Home`** (Frame All) or
+> **`Numpad 0`** in Blender. Watch out: opening your own window while also using
+> `--gui` gives you **two Blenders** — the agent's objects live in the one it opened.
+
 ---
 
 ## 6. Optional: install the Blender add-on
@@ -290,42 +328,42 @@ Output: `dist/blender_mcp_bridge-<version>.zip` — handy for GitHub Releases.
    and a token
 3. Press **"Copy connection command"**
 
-### 6e. Point your agent at it
+### 6e. Day-to-day use (the add-on)
 
-```bash
-hermes mcp add blender --command "/path/to/.venv/bin/python" --connect-timeout 60 \
-  --args /path/to/blender_mcp_server.py --attach 127.0.0.1:9876 --token "<token from the panel>"
+**Normally you press nothing.** The add-on starts the bridge for you when a `.blend`
+loads (turn that off in the panel if you prefer manual control).
+
+1. Open Blender and your working file
+2. Press **`N`** -> **"Blender MCP"** tab: it should say the bridge is running, with
+   `host:port` (default `127.0.0.1:9876`) and a token. If not, press **"Start bridge"**
+3. Put that token in the Hermes config (once - it stays until you press **"New token"**)
+
+```yaml
+    args:
+      - C:\\Hermes-blender-mcp\\blender_mcp_server.py
+      - --attach
+      - 127.0.0.1:9876
+      - --token
+      - "<token from the panel>"
 ```
 
-> The bridge also **starts automatically** when you open a `.blend` (toggle
-> "autostart" in the panel) — you can skip pressing the button.
->
-> The port must match the panel **and** the token must match. Both are just
-> defaults/configurable — the port only ever listens on `127.0.0.1`.
-> Never expose this port to a network: the protocol is unencrypted.
+4. Restart Hermes and give it a task - objects appear in the window you already have open
 
-<details>
-<summary>Manual install (without the ZIP builder) — advanced</summary>
+**Panel buttons**
 
-Create a folder named `blender_mcp_bridge` inside Blender's add-ons directory and
-put **both** files inside it:
-
-```
-<addons>/blender_mcp_bridge/
-├── __init__.py            ← from blender_addon/__init__.py
-└── blender_bridge.py      ← from the repo root
-```
-
-| OS | Add-ons directory (Blender 5.2) |
+| Button | When to use it |
 |---|---|
-| Windows | `%APPDATA%\Blender Foundation\Blender\5.2\scripts\addons\` |
-| Linux | `~/.config/blender/5.2/scripts/addons/` |
-| macOS | `~/Library/Application Support/Blender/5.2/scripts/addons/` |
+| Start / Stop bridge | Turn the listener in this Blender instance on or off |
+| New token | If you suspect the token leaked (update the Hermes config afterwards) |
+| Copy connect command | Copies the `--attach ... --token ...` line ready to paste |
 
-Both files must sit together — the add-on loads the bridge from its own folder.
-</details>
+**Things to keep in mind**
 
----
+- Closing Blender stops the bridge; reopening starts it again
+- With several Blender windows open they all want port 9876 - set a different port in each panel
+- `--attach` and `--gui` are alternatives, not a combination
+- The bridge listens on `127.0.0.1` only. Never expose this port to a network: the
+  protocol is unencrypted, and anyone who connects can drive your Blender
 
 ## 7. Using it
 

@@ -145,31 +145,58 @@ hermes mcp add blender `
 
 ---
 
-## (ทางเลือก) โหมดมีหน้าต่าง — เห็นภาพขณะ AI ทำ
+## (ทางเลือก) โหมดเห็นสด — เห็น AI ทำงานในหน้าต่าง Blender
 
-ถ้าอยากนั่งดู Blender เปลี่ยนไปมาให้ใช้ add-on:
+ค่าปริยายเป็น headless: AI สร้างของจริง แต่มองไม่เห็น — ถ้าอยากดูของโผล่ทีละชิ้น
+เลือก **หนึ่ง** ในสองทางนี้
 
-1. คัดลอกโฟลเดอร์ `blender_addon` ไปเป็นชื่อ `blender_mcp_bridge` ที่:
+### ทางที่ 1 (ง่ายสุด) — `--gui` ไม่ต้องติดตั้ง add-on
+
+แก้ `%USERPROFILE%\.hermes\profiles\<ชื่อโปรไฟล์>\config.yaml` (หรือ
+`~\.hermes\config.yaml`) ให้ args มี **สองบรรทัดแยกกัน**:
+
+```yaml
+mcp_servers:
+  blender:
+    command: C:\Hermes-blender-mcp\.venv\Scripts\python.exe
+    args:
+      - C:\Hermes-blender-mcp\blender_mcp_server.py
+      - --gui
+    connect_timeout: 120.0
+    timeout: 300
+    enabled: true
+```
+
+- ⚠️ **ห้ามเขียน `- --gui` ต่อท้ายบรรทัด path** — จะกลายเป็นค่าเดียว
+  `...blender_mcp_server.py- --gui` แล้ว `--gui` ไม่ทำงาน (อาการ: ของไม่โผล่)
+- รีสตาร์ต Hermes → ครั้งแรกที่ AI เรียกเครื่องมือ **หน้าต่าง Blender จะเปิดเอง**
+- ตรวจโหมดนี้โดยไม่ต้องผ่าน Hermes:
+
+```bat
+cd C:\Hermes-blender-mcp
+run-hermes-blender-mcp.bat --selftest --gui
+```
+✅ ควรเห็น `timer เต้นปกติ (tick 1)` → `พร้อมใช้งาน · Blender 5.2.2` → ผ่าน 11 ขั้น
+
+### ทางที่ 2 — add-on + `--attach` (ใช้หน้าต่างที่คุณเปิดอยู่)
+
+**ติดตั้ง (เลือกวิธีเดียว)**
 
 ```powershell
-# เปิดโฟลเดอร์ addons ของ Blender 5.2
-explorer "$env:APPDATA\Blender Foundation\Blender\5.2\scripts\addons"
+# วิธี ก: ให้เซิร์ฟเวอร์ติดตั้งให้เลย
+.\.venv\Scripts\python.exe blender_mcp_server.py --install-addon
+
+# วิธี ข: สร้าง zip แล้วติดตั้งผ่าน UI
+.\.venv\Scripts\python.exe tools\build_addon_zip.py
+# → Blender: Edit > Preferences > Add-ons > ▼ > Install from Disk… > เลือก dist\blender_mcp_bridge-<เวอร์ชัน>.zip
 ```
 
-2. สร้างโฟลเดอร์ `blender_mcp_bridge` แล้ววาง **สองไฟล์** นี้ข้างใน:
-   - `blender_addon\__init__.py` → เปลี่ยนชื่อเป็น `__init__.py` ในโฟลเดอร์ใหม่
-   - `blender_bridge.py` (จากโฟลเดอร์โปรเจกต์)
+**ใช้งานประจำวัน**
 
-```
-%APPDATA%\Blender Foundation\Blender\5.2\scripts\addons\blender_mcp_bridge\
-├── __init__.py            ← จาก blender_addon/__init__.py
-└── blender_bridge.py      ← จากโฟลเดอร์โปรเจกต์
-```
-
-3. เปิด Blender → `Edit > Preferences > Add-ons` → ค้นหา **"Hermes Blender MCP"** → ติ๊กเปิด
-4. กด `N` ในมุมมอง 3D → แท็บ **"Blender MCP"** → กด **"เริ่มสะพาน (Start bridge)"**
-5. จะเห็นพอร์ต (ค่าปริยาย 9876) และ token — กด **"คัดลอกคำสั่งเชื่อมต่อ"**
-6. สั่ง Hermes ให้ใช้โหมด attach:
+1. เปิด Blender + ไฟล์งาน (add-on เริ่มสะพานให้เองเมื่อโหลดไฟล์)
+2. กด **`N`** → แท็บ **"Blender MCP"** → ตรวจว่า **"สะพานทำงานอยู่"** + เห็น `host:port` และ token
+   (ถ้าไม่ทำงาน กด **"เริ่มสะพาน"**)
+3. กด **"คัดลอกคำสั่งเชื่อมต่อ"** แล้ววางใน config ของ Hermes:
 
 ```powershell
 hermes mcp add blender `
@@ -178,8 +205,20 @@ hermes mcp add blender `
   --args C:\Hermes-blender-mcp\blender_mcp_server.py --attach 127.0.0.1:9876 --token "วาง_TOKEN"
 ```
 
-> 💡 ในโหมดนี้ Blender ต้องเปิดอยู่และกด "เริ่มสะพาน" ไว้ก่อนเสมอ
-> และ **ควรบันทึกไฟล์ก่อน** ให้ AI ทำอะไร เพื่อกันมือลั่น
+4. รีสตาร์ต Hermes → สั่งงาน → เห็นของโผล่ในหน้าต่างเดิม ✅
+
+> 💡 ปุ่มในแผง: **เริ่ม/หยุดสะพาน** · **สร้าง token ใหม่** (ต้องอัปเดต config ตาม) ·
+> **คัดลอกคำสั่งเชื่อมต่อ**
+> ⚠️ ปิด Blender = สะพานหยุด · ถ้าเปิดหลายหน้าต่างให้ตั้งพอร์ตต่างกัน
+> ⚠️ โหมดนี้ควร **บันทึกไฟล์ก่อน** ให้ AI ทำอะไร เพื่อกันมือลั่น
+
+### 🩺 ของไม่โผล่ในหน้าต่าง?
+
+| อาการ | ทางแก้ |
+|---|---|
+| มีวัตถุแต่ไม่เห็น | กด **`Home`** (Frame All) หรือ **`Numpad 0`** (มุมมองกล้อง) |
+| หน้าต่างเปิดแล้วปิดทันที | ต่อสะพานไม่ติด → เซิร์ฟเวอร์ปิดให้เอง (กันหน้าต่างผี) · ดู log `%TEMP%\Hermes-blender-mcp\server-*.log` |
+| ของไปโผล่ที่อื่น | มี **Blender 2 ตัว** — ใช้ `--gui` (ของอยู่ตัวที่ AI เปิด) หรือ `--attach` (ของอยู่ตัวที่คุณเปิด) อย่างใดอย่างหนึ่ง |
 
 ---
 
