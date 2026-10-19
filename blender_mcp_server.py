@@ -52,7 +52,7 @@ from mcp.types import TextContent
 
 HERE = pathlib.Path(__file__).resolve().parent
 BRIDGE_SCRIPT = HERE / "blender_bridge.py"
-SERVER_VERSION = "1.0.9"
+SERVER_VERSION = "1.0.10"
 MIN_BLENDER = (4, 0)          # ใช้ API ที่มีมาตั้งแต่ 4.0 (5.2 คือเป้าหมาย)
 # เวอร์ชันโปรโตคอลระหว่างเซิร์ฟเวอร์กับสะพาน — ต้องตรงกัน ไม่งั้นมักแปลว่า
 # add-on ที่ติดตั้งไว้เป็นเวอร์ชันเก่า (bridge เก่าคุยกับเซิร์ฟเวอร์ใหม่)
@@ -892,6 +892,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--list-tools", action="store_true", help="พิมพ์รายการเครื่องมือแล้วจบ")
     p.add_argument("--selftest", action="store_true",
                    help="เริ่ม Blender จริง เรียกทุกเครื่องมือ แล้วจบ (ใช้ตรวจการติดตั้ง)")
+    p.add_argument("--warmup", action="store_true",
+                   help="เปิด/ตรวจ Blender ทันทีตอนสตาร์ต (ค่าปริยายคือรอให้เรียกก่อน)")
     p.add_argument("--deep", action="store_true",
                    help="ใช้คู่กับ --selftest: ตรวจเพิ่มของที่ต้องใช้เครือข่าย/ไฟล์ "
                         "(ค้น+โหลด Poly Haven แล้วนำเข้าโมเดล · บันทึก .blend)")
@@ -976,12 +978,18 @@ def main(argv: list[str] | None = None) -> int:
 
     atexit.register(rt.shutdown)
 
-    # เปิด Blender ล่วงหน้า (ให้ข้อผิดพลาดโผล่ตอนเริ่ม ไม่ใช่ตอน AI เรียกครั้งแรก)
-    try:
-        rt.ensure()
-    except Exception as exc:  # noqa: BLE001
-        log("เตือน: ยังเปิด Blender ไม่ได้ตอนเริ่ม — จะลองอีกครั้งเมื่อมีคำสั่งเรียก")
-        log(f"       สาเหตุ: {exc}")
+    # ⚠️ ค่าปริยาย = LAZY: ห้ามเปิด Blender จนกว่าจะมีการเรียกเครื่องมือจริง
+    #    บทเรียนจริง: Hermes Desktop เริ่ม MCP server ทันทีตอนเปิดแอป → ถ้า warm up
+    #    ที่นี่ Blender จะเปิดเองทั้งที่ผู้ใช้ยังไม่ได้สั่งอะไร (น่ารำคาญและกินแรม)
+    #    ใช้ --warmup ถ้าอยากให้ตรวจ/เปิดล่วงหน้า (เช่น ตอน debug)
+    if getattr(args, "warmup", False):
+        try:
+            rt.ensure()
+        except Exception as exc:  # noqa: BLE001
+            log("เตือน: ยังเปิด Blender ไม่ได้ตอนเริ่ม — จะลองอีกครั้งเมื่อมีคำสั่งเรียก")
+            log(f"       สาเหตุ: {exc}")
+    else:
+        log("โหมด lazy: จะเปิด Blender เมื่อมีการเรียกเครื่องมือครั้งแรกเท่านั้น")
 
     log("พร้อมรับคำสั่งผ่าน stdio")
     try:

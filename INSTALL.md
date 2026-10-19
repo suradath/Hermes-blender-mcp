@@ -245,6 +245,7 @@ Windows — use double backslashes in JSON:
 | `--timeout 300` | Long scripts or renders |
 | `--gui` | Launch Blender **with** a window (uses the timer mode) |
 | `--attach 127.0.0.1:9876 --token …` | Attach to a Blender that is already running (see step 6) |
+| `--warmup` | Check/launch Blender **at start-up** (the default is lazy: Blender starts on the first tool call) |
 | `--check` / `--list-tools` / `--selftest` | Diagnostics |
 
 ### 5.1 Watching the agent work (live mode)
