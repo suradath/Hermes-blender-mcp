@@ -60,7 +60,7 @@ hermes mcp add blender --command "$PWD/.venv/bin/python" --connect-timeout 120 \
 4. [ต่อเข้ากับ Hermes — ข้อมูลเชิงลึก](#4-ต่อเข้ากับ-hermes--ข้อมูลเชิงลึก)
 5. [ลองสั่งงานครั้งแรก](#5-ลองสั่งงานครั้งแรก)
 6. [ทำไมต้องแยกเป็นสองโปรเซส](#6-ทำไมต้องแยกเป็นสองโปรเซส)
-7. [เครื่องมือทั้งหมด 12 ตัว](#7-เครื่องมือทั้งหมด-12-ตัว)
+7. [เครื่องมือทั้งหมด 13 ตัว](#7-เครื่องมือทั้งหมด-13-ตัว)
 8. [ความปลอดภัยของ execute_blender_script](#8-ความปลอดภัยของ-execute_blender_script)
 9. [แก้ปัญหา](#9-แก้ปัญหา)
 10. [ทดสอบ / สถานะความน่าเชื่อถือ](#10-ทดสอบ--สถานะความน่าเชื่อถือ)
@@ -293,10 +293,10 @@ hermes mcp add blender --command "/path/to/Hermes-blender-mcp/.venv/bin/python" 
 
 ```
   Connecting to 'blender'...
-  ✓ Connected! Found 12 tool(s) from 'blender':
+  ✓ Connected! Found 13 tool(s) from 'blender':
     get_scene_hierarchy · add_primitive_mesh · modify_object_transform ...
-  Enable all 12 tools? [Y/n/select]:
-  ✓ Saved 'blender' to ~/.hermes/config.yaml (12/12 tools enabled)
+  Enable all 13 tools? [Y/n/select]:
+  ✓ Saved 'blender' to ~/.hermes/config.yaml (13/13 tools enabled)
   Start a new session to use these tools, or run /reload-mcp.
 ```
 
@@ -456,6 +456,13 @@ mcp_servers:
 
 > "ค้นหาเก้าอี้ฟรีใน Poly Haven แล้วโหลดตัวที่ไฟล์เล็กสุดมาวางที่ (2,0,0)"
 
+**3.5) ให้เปิด Blender ให้ดูผลงาน**
+
+> "สร้างเสร็จแล้วเรียก show_in_blender ให้หนูดูหน่อย"
+
+→ AI จะบันทึก `.blend` แล้ว **เปิดหน้าต่าง Blender** ให้เห็นของจริง ✅
+(โหมด headless: เปิดหน้าต่างใหม่แยก · โหมด `--gui`/`--attach`: ใช้หน้าต่างเดิม)
+
 **4) สคริปต์เอง**
 
 > "เขียนสคริปต์ bpy สร้างเกลียว 30 วงกลมรอบแกน Z แล้วบันทึกเป็น C:\\งาน\\เกลียว.blend"
@@ -504,7 +511,7 @@ MCP สื่อสารผ่าน stdio แต่ `blender -b` พ่นข�
 
 ---
 
-## 7. เครื่องมือทั้งหมด 12 ตัว
+## 7. เครื่องมือทั้งหมด 13 ตัว
 
 | เครื่องมือ | ทำอะไร (ภาษาคน) |
 |---|---|
@@ -515,6 +522,7 @@ MCP สื่อสารผ่าน stdio แต่ `blender -b` พ่นข�
 | `delete_object` | ลบวัตถุ — มีสลัก `confirm` กันลบพลาด |
 | `set_object_material` | ใส่วัสดุ Principled BSDF สีง่าย ๆ (metallic/roughness/alpha) |
 | `save_blend_file` | บันทึกไฟล์ `.blend` (ไม่ทับเองถ้าไม่ได้สั่ง) |
+| **`show_in_blender`** | **บันทึกแล้วเปิดหน้าต่าง Blender ให้คนดูผลงาน** — โหมด headless จะเปิดโปรเซสแยก (MCP ทำงานต่อได้) · โหมด gui/attach ใช้หน้าต่างเดิม |
 | `execute_blender_script` | รันโค้ด `bpy` ดิบ — มีด่านความปลอดภัย AST ([อ่านก่อนใช้](#8-ความปลอดภัยของ-execute_blender_script)) |
 | `get_viewport_screenshot` | เรนเดอร์ภาพส่งให้ AI "เห็น" ฉาก — คืนเป็นรูปจริง + ข้อมูลกำกับ |
 | `search_polyhaven` | ค้นคลัง CC0 ฟรี (HDRI/เท็กซ์เจอร์/โมเดล) — **ไม่ต้องใช้คีย์** |
@@ -620,7 +628,7 @@ bash tests/run_all.sh      # รันทุกชุด (ไม่ต้อง�
 | | สถานะ |
 |---|---|
 | ⭐ **รันบน Blender จริง** — Windows 11 + Blender 5.2.2 · `--selftest --deep` **ผ่านครบ 14/14** (ฉาก · สร้าง · ย้าย · วัสดุ · รายละเอียด · สคริปต์ · ลบ · เส้นทางคอลเลกชัน · ภาพหน้าจอใต้ `--background` · ทรัพยากร · บันทึก `.blend` 96 KB · ค้น Poly Haven 24 รายการ · **โหลด gltf เข้าฉากจริง 3→4 วัตถุ**) | ✅ **ยืนยันแล้ว** (17 ต.ค. 2026 · รอบแรก v1.0.0 ผ่าน 8/9 และจับบั๊ก `Collection.parent` ได้จริง) |
-| ⭐ **Hermes ตัวจริงเชื่อมต่อได้** — `hermes mcp add` → `✓ Connected! Found 12 tool(s)` | ✅ ยืนยันแล้ว |
+| ⭐ **Hermes ตัวจริงเชื่อมต่อได้** — `hermes mcp add` → `✓ Connected! Found 13 tool(s)` | ✅ ยืนยันแล้ว |
 | สื่อสาร MCP (handshake, tool list, สคีมา, เรียกใช้, resource, error) | ✅ MCP client ทางการ (56 ข้อ) |
 | ลิงก์ในเอกสารไม่เสีย | ✅ ตรวจทุก push |
 | โปรโตคอลสะพาน (token, JSON บรรทัดละคำขอ, ข้อผิดพลาด) | ✅ ผ่านซ็อกเก็ตจริง |

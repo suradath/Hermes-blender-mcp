@@ -52,7 +52,7 @@ from mcp.types import TextContent
 
 HERE = pathlib.Path(__file__).resolve().parent
 BRIDGE_SCRIPT = HERE / "blender_bridge.py"
-SERVER_VERSION = "1.0.10"
+SERVER_VERSION = "1.0.11"
 MIN_BLENDER = (4, 0)          # ใช้ API ที่มีมาตั้งแต่ 4.0 (5.2 คือเป้าหมาย)
 # เวอร์ชันโปรโตคอลระหว่างเซิร์ฟเวอร์กับสะพาน — ต้องตรงกัน ไม่งั้นมักแปลว่า
 # add-on ที่ติดตั้งไว้เป็นเวอร์ชันเก่า (bridge เก่าคุยกับเซิร์ฟเวอร์ใหม่)
@@ -736,6 +736,55 @@ def register_tools(srv: MCPServer, rt: Runtime) -> None:
         """Save the current .blend. Without filepath it saves in place (the file
         must have been saved before). A '.blend' extension is added if missing."""
         return await _run(lambda: rt.call("save_blend_file", filepath=filepath))
+
+    @srv.tool()
+    async def show_in_blender(filepath: str = "") -> dict:
+        """Save the scene and SHOW it to the human in a Blender window.
+
+        Use this when the work is done and somebody wants to look at it: in
+        headless mode it writes a .blend and launches a normal Blender window with
+        that file (a separate, detached process - your own session keeps running),
+        while in --gui/--attach mode the already-open window is used and nothing is
+        launched twice. Returns the file path and whether a window was opened.
+        """
+        import tempfile as _tf
+
+        target = filepath.strip()
+        if not target:
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            target = str(pathlib.Path(_tf.gettempdir()) / "Hermes-blender-mcp"
+                         / f"result-{stamp}.blend")
+        target = str(pathlib.Path(target).expanduser())
+        if not target.lower().endswith(".blend"):
+            target += ".blend"
+        saved = await _run(lambda: rt.call("save_blend_file", filepath=target))
+        scene = await _run(lambda: rt.call("get_scene_hierarchy", max_objects=1))
+
+        # หน้าต่างที่มีอยู่แล้ว (gui / attach) = เห็นงานอยู่แล้ว ไม่ต้องเปิดซ้ำ
+        if rt.cfg.gui or rt.cfg.attach:
+            return {"opened_new_window": False, "filepath": target, "saved": saved,
+                    "note": "หน้าต่าง Blender ที่เปิดอยู่แสดงฉากนี้ให้ดูแล้ว "
+                            "(โหมด gui/attach) — ไม่ได้เปิดหน้าต่างใหม่"}
+
+        exe, how = find_blender(rt.cfg.blender)
+        if exe is None:
+            raise ToolError(f"หา Blender ไม่เจอ ({how}) — บันทึกไฟล์ไว้ที่ {target} "
+                            f"แล้ว แต่เปิดหน้าต่างให้ไม่ได้")
+        # เปิดเป็นโปรเซสแยกแบบ detachment: ไม่บล็อก MCP และไม่ผูกกับชีวิตเซิร์ฟเวอร์
+        kwargs: dict = {"cwd": str(exe.parent)}
+        if os.name == "nt":
+            kwargs["creationflags"] = 0x00000008 | 0x00000200   # DETACHED | NEW_GROUP
+        else:
+            kwargs["start_new_session"] = True
+        kwargs["stdout"] = subprocess.DEVNULL
+        kwargs["stderr"] = subprocess.DEVNULL
+        proc = subprocess.Popen([str(exe), target], **kwargs)
+        return {"opened_new_window": True, "filepath": target, "saved": saved,
+                "pid": proc.pid, "blender": str(exe),
+                "objects": (scene.get("totals") or {}).get("objects"),
+                "note": "เปิด Blender หน้าต่างใหม่ให้ดูผลงานแล้ว — "
+                        "เซสชัน MCP ยังทำงานต่อได้ปกติ"}
+
 
     @srv.tool()
     async def get_viewport_screenshot(filepath: str = "", width: int = 0,

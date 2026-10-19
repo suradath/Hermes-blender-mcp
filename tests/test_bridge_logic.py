@@ -328,7 +328,8 @@ check("hello → บอกว่ารันแบบ background", r["result"]["
 
 r = br.handle_message({"id": 9, "method": "list_tools"})
 names = [t["name"] for t in r["result"]]
-check("list_tools → 12 เครื่องมือ", len(names) == 12, str(names))
+# สะพานมี 12 · show_in_blender เป็นเครื่องมือฝั่งเซิร์ฟเวอร์ (เปิดหน้าต่างให้คนดู)
+check("list_tools → 12 เครื่องมือ (ฝั่งสะพาน)", len(names) == 12, str(names))
 for want in ("get_scene_hierarchy", "add_primitive_mesh", "modify_object_transform",
              "execute_blender_script", "get_viewport_screenshot",
              "search_polyhaven", "get_polyhaven_info", "download_polyhaven_asset"):
